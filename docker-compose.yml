@@ -1,0 +1,154 @@
+version: '3.8'
+
+services:
+  vcpkg-harbor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vcpkg-harbor
+    environment:
+      - VCPKG_HOST=0.0.0.0
+      - VCPKG_PORT=15151
+      - VCPKG_STORAGE_TYPE=minio
+      - VCPKG_MINIO_ENDPOINT=minio:9000
+      - VCPKG_MINIO_ACCESS_KEY=minioadmin
+      - VCPKG_MINIO_SECRET_KEY=minioadmin
+      - VCPKG_MINIO_BUCKET=vcpkg-harbor
+      - VCPKG_MINIO_SECURE=false
+      - VCPKG_LOG_LEVEL=INFO
+      - VCPKG_LOG_JSON=true
+      - VCPKG_LOG_FILE=/var/log/vcpkg-harbor/vcpkg-harbor.log
+    ports:
+      - "15151:15151"
+    volumes:
+      - harbor_logs:/var/log/vcpkg-harbor
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - harbor-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:15151/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: vcpkg-harbor-minio
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_PROMETHEUS_AUTH_TYPE=public
+    command: server --console-address ":9001" /data
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console
+    volumes:
+      - minio_data:/data
+    networks:
+      - harbor-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vcpkg-harbor-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - harbor-network
+    profiles:
+      - monitoring
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: vcpkg-harbor-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - harbor-network
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+    restart: unless-stopped
+
+  traefik:
+    image: traefik:v2.10
+    container_name: vcpkg-harbor-traefik
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/acme.json:/acme.json
+    networks:
+      - harbor-network
+    profiles:
+      - production
+    restart: unless-stopped
+
+volumes:
+  minio_data:
+    driver: local
+  harbor_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  harbor-network:
+    driver: bridge
+    name: vcpkg-harbor-network
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
