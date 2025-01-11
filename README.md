@@ -1,198 +1,187 @@
 # vcpkg-harbor
 
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.0+-00a393.svg)](https://fastapi.tiangolo.com)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-A high-performance binary cache server for vcpkg that supports both local filesystem and MinIO storage backends.
+A binary cache server for vcpkg, Microsoft's C++ package manager.
 
 ## Features
 
-- Filesystem and MinIO storage support
-- High-performance async I/O operations
-- Structured logging with file output
-- Docker support with configurable deployment
-- Health checks and Prometheus metrics
+- Binary package caching using MinIO storage backend
+- Streaming uploads and downloads
+- Environment-based configuration
+- Comprehensive logging
+- Docker support
+- Multi-worker deployment support
 - Read-only and write-only modes
-- CORS support
-- Multi-worker configuration
 
-## Quick Start
+## Prerequisites
 
-### Using Docker (Recommended)
+- Python 3.8+
+- MinIO server (can be run via Docker)
+- Docker (optional, for containerized deployment)
 
+## Installation
+
+### Local Development Setup
+
+1. Clone the repository:
 ```bash
-# Start the server with MinIO
-docker compose up -d
-
-# Configure vcpkg to use the cache
-export VCPKG_BINARY_SOURCES="http,http://localhost:15151/{name}/{version}/{sha}"
+git clone https://github.com/yourusername/vcpkg-harbor.git
+cd vcpkg-harbor
 ```
 
-Access the MinIO console at http://localhost:9001 (default credentials: minioadmin/minioadmin).
-
-### Manual Installation
-
+2. Create a virtual environment:
 ```bash
-# Create and activate virtual environment
 python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
+source .venv/bin/activate  # Linux/Mac
+# OR
 .venv\Scripts\activate     # Windows
+```
 
-# Install dependencies
-pip install -r requirements.txt
+3. Install dependencies:
+```bash
+pip install fastapi uvicorn minio pydantic-settings
+```
 
-# Start the server
-./run.sh  # Linux/macOS
-run.bat   # Windows
+### Docker Setup
+
+1. Using docker-compose:
+```bash
+docker-compose up -d
+```
+
+2. Using Docker directly:
+```bash
+docker build -t vcpkg-harbor .
+docker run -d -p 15151:15151 vcpkg-harbor
 ```
 
 ## Configuration
 
-### Environment Variables
+Create a `.env` file in the project root:
 
-```bash
-# Server
+```env
+# Server settings
 VCPKG_HOST=0.0.0.0
 VCPKG_PORT=15151
 VCPKG_WORKERS=4
+VCPKG_READ_ONLY=false
+VCPKG_WRITE_ONLY=false
 
-# Storage
-VCPKG_STORAGE_TYPE=minio  # or 'file'
-VCPKG_STORAGE_PATH=./cache  # for file storage
+# Storage settings
+VCPKG_STORAGE_TYPE=minio
+VCPKG_STORAGE_PATH=./cache
 
-# MinIO
-VCPKG_MINIO_ENDPOINT=minio:9000
+# MinIO settings
+VCPKG_MINIO_ENDPOINT=localhost:9000
 VCPKG_MINIO_ACCESS_KEY=minioadmin
 VCPKG_MINIO_SECRET_KEY=minioadmin
 VCPKG_MINIO_BUCKET=vcpkg-harbor
 VCPKG_MINIO_SECURE=false
 
-# Logging
+# Logging settings
 VCPKG_LOG_LEVEL=INFO
-VCPKG_LOG_JSON=true
+VCPKG_LOG_JSON=false
 VCPKG_LOG_FILE=logs/vcpkg-harbor.log
-
-# Operation Mode
-VCPKG_READ_ONLY=false
-VCPKG_WRITE_ONLY=false
+VCPKG_LOG_RETENTION_DAYS=30
 ```
 
-### Run Scripts
+## Usage
 
-Both Windows (`run.bat`) and Unix (`run.sh`) scripts support:
+### Starting the Server
+
+#### Using Scripts
+
+Linux/Mac:
+```bash
+./run.sh
+```
+
+Windows:
+```bash
+run.bat
+```
+
+#### Manual Start
 
 ```bash
-Options:
-  --help          Show help message
-  --prod          Run in production mode
-  --dev           Run in development mode (default)
-  --port <port>   Set port number
-  --host <host>   Set host address
-  --storage <type> Set storage type (file/minio)
-  --path <path>   Set storage path
-  --log-level <level> Set log level
-  --workers <num> Set number of workers
-  --docker        Run using Docker
-  --docker-dev    Run using Docker in development mode
+python main.py
 ```
 
-## API Endpoints
+### Configuring vcpkg
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/{name}/{version}/{sha}` | HEAD | Check if package exists |
-| `/{name}/{version}/{sha}` | GET | Download package |
-| `/{name}/{version}/{sha}` | PUT | Upload package |
-| `/` | GET | Health check |
-| `/metrics` | GET | Prometheus metrics |
-
-## Docker Deployment
-
-### Basic Setup
+Add the binary cache to your vcpkg configuration:
 
 ```bash
-# Production deployment
-docker compose up -d
-
-# Development with hot reload
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+export VCPKG_BINARY_SOURCES="http,http://localhost:15151/{name}/{version}/{sha}"
 ```
 
-### Available Services
+### API Endpoints
 
-- vcpkg-harbor (`:15151`): Main server
-- MinIO (`:9000`, `:9001`): Object storage
-- Prometheus (`:9090`): Metrics (optional)
-- Grafana (`:3000`): Dashboards (optional)
-
-### Monitoring
-
-Enable monitoring services:
-
+1. Check Package Existence:
 ```bash
-docker compose --profile monitoring up -d
+HEAD /{name}/{version}/{sha}
 ```
 
-## Development
-
-### Running Tests
-
+2. Download Package:
 ```bash
-# Install dev dependencies
-pip install -r requirements-dev.txt
-
-# Run tests
-pytest
-
-# Run with coverage
-pytest --cov=app tests/
+GET /{name}/{version}/{sha}
 ```
 
-### Code Style
-
+3. Upload Package:
 ```bash
-# Format code
-black app/ tests/
-
-# Check types
-mypy app/
-
-# Lint code
-flake8 app/ tests/
+PUT /{name}/{version}/{sha}
 ```
 
-## Production Setup
+## Testing
 
-1. Configure environment:
+1. Start MinIO:
 ```bash
-cp .env.example .env
-# Edit .env with your settings
+docker run -d -p 9000:9000 -p 9001:9001 minio/minio server /data
 ```
 
-2. Use production profile:
+2. Start vcpkg-harbor:
 ```bash
-docker compose --profile production up -d
+python main.py
 ```
 
-3. Configure Traefik (included in production profile):
-   - Add SSL certificates
-   - Configure domains
-   - Set up authentication if needed
+3. Configure vcpkg:
+```bash
+export VCPKG_BINARY_SOURCES="http,http://localhost:15151/{name}/{version}/{sha}"
+```
+
+4. Test with vcpkg:
+```bash
+vcpkg install some-package
+```
+
+## Production Deployment
+
+For production deployment, consider:
+
+1. Enable SSL/TLS
+2. Configure proper authentication
+3. Use a production-grade MinIO setup
+4. Set up monitoring and alerting
+5. Configure proper logging
+6. Use a reverse proxy (e.g., nginx)
+
+## Logs
+
+Logs are stored in `logs/vcpkg-harbor.log` by default. The logging system features:
+
+- Log rotation (daily)
+- Configurable retention period
+- JSON format support
+- Multiple log levels
+- Console and file output
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Run tests
-4. Submit pull request
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
 
 ## License
 
-[MIT License](LICENSE)
-
-## Support
-
-- File issues in the Github issue tracker
-- Check the documentation in the `docs` directory
-- Read [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
+This project is licensed under the MIT License - see the LICENSE file for details.
