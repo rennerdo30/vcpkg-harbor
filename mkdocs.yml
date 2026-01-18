@@ -1,0 +1,112 @@
+site_name: vcpkg-harbor
+site_description: Binary cache server for vcpkg with plugin-based storage backends
+site_url: https://github.com/rennerdo30/vcpkg-harbor
+repo_url: https://github.com/rennerdo30/vcpkg-harbor
+repo_name: rennerdo30/vcpkg-harbor
+
+# Theme Configuration - Luminous Void Theme
+theme:
+  name: material
+  custom_dir: overrides
+  language: en
+
+  # Color palette with toggle (dark mode default, matching renner.dev)
+  palette:
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+  # Font configuration
+  font:
+    text: Inter
+    code: Fira Code
+
+  # Features
+  features:
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+    - header.autohide
+
+  # Icons
+  icon:
+    logo: material/rocket-launch
+    repo: fontawesome/brands/github
+
+  # Favicon
+  favicon: assets/images/favicon.png
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: true
+            show_root_heading: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - tables
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - Configuration: getting-started/configuration.md
+  - User Guide:
+      - Storage Backends: user-guide/storage-backends.md
+      - Authentication: user-guide/authentication.md
+      - Dashboard: user-guide/dashboard.md
+      - Metrics: user-guide/metrics.md
+  - Deployment:
+      - Docker: deployment/docker.md
+      - Kubernetes: deployment/kubernetes.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Architecture: development/architecture.md
+      - Testing: development/testing.md
+  - API Reference: api-reference.md
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/rennerdo30/vcpkg-harbor
