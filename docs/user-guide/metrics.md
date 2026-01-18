@@ -1,0 +1,118 @@
+# Prometheus Metrics
+
+vcpkg-harbor exposes Prometheus metrics for monitoring.
+
+## Enabling Metrics
+
+```bash
+VCPKG_METRICS_ENABLED=true
+VCPKG_METRICS_PATH=/metrics
+```
+
+## Accessing Metrics
+
+```bash
+curl http://localhost:15151/metrics
+```
+
+## Available Metrics
+
+### Cache Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `vcpkg_harbor_cache_hits_total` | Counter | Total cache hits |
+| `vcpkg_harbor_cache_misses_total` | Counter | Total cache misses |
+| `vcpkg_harbor_uploads_total` | Counter | Total uploads |
+| `vcpkg_harbor_downloads_total` | Counter | Total downloads |
+| `vcpkg_harbor_errors_total` | Counter | Total errors |
+
+### Storage Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `vcpkg_harbor_packages_total` | Gauge | Total packages in cache |
+| `vcpkg_harbor_storage_bytes` | Gauge | Total storage used |
+
+### Request Metrics
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `vcpkg_harbor_request_latency_seconds` | Histogram | Request latency |
+
+## Prometheus Configuration
+
+Add vcpkg-harbor to your Prometheus scrape config:
+
+```yaml
+scrape_configs:
+  - job_name: 'vcpkg-harbor'
+    static_configs:
+      - targets: ['localhost:15151']
+    metrics_path: /metrics
+```
+
+## Grafana Dashboard
+
+Example Grafana dashboard queries:
+
+### Cache Hit Rate
+
+```promql
+rate(vcpkg_harbor_cache_hits_total[5m]) /
+(rate(vcpkg_harbor_cache_hits_total[5m]) + rate(vcpkg_harbor_cache_misses_total[5m])) * 100
+```
+
+### Request Rate
+
+```promql
+rate(vcpkg_harbor_request_latency_seconds_count[5m])
+```
+
+### Average Latency
+
+```promql
+rate(vcpkg_harbor_request_latency_seconds_sum[5m]) /
+rate(vcpkg_harbor_request_latency_seconds_count[5m])
+```
+
+### Storage Growth
+
+```promql
+vcpkg_harbor_storage_bytes
+```
+
+## Alerting Rules
+
+Example Prometheus alerting rules:
+
+```yaml
+groups:
+  - name: vcpkg-harbor
+    rules:
+      - alert: VcpkgHarborDown
+        expr: up{job="vcpkg-harbor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "vcpkg-harbor is down"
+
+      - alert: VcpkgHarborHighErrorRate
+        expr: rate(vcpkg_harbor_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate in vcpkg-harbor"
+
+      - alert: VcpkgHarborLowCacheHitRate
+        expr: |
+          rate(vcpkg_harbor_cache_hits_total[1h]) /
+          (rate(vcpkg_harbor_cache_hits_total[1h]) + rate(vcpkg_harbor_cache_misses_total[1h])) < 0.5
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low cache hit rate"
+```

@@ -102,6 +102,7 @@ nav:
       - Architecture: development/architecture.md
       - Testing: development/testing.md
   - API Reference: api-reference.md
+  - Changelog: changelog.md
 
 extra_css:
   - assets/stylesheets/extra.css

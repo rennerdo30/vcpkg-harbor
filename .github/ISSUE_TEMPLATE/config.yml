@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://rennerdo30.github.io/vcpkg-harbor/
+    about: Check the documentation for answers
+  - name: Discussions
+    url: https://github.com/rennerdo30/vcpkg-harbor/discussions
+    about: Ask questions and discuss ideas

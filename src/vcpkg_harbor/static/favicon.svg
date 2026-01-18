@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5"/>
+      <stop offset="100%" style="stop-color:#3730A3"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="6" fill="url(#bg)"/>
+  <!-- Simplified box/container icon -->
+  <rect x="7" y="12" width="8" height="6" rx="1" fill="#A5B4FC"/>
+  <rect x="17" y="12" width="8" height="6" rx="1" fill="#A5B4FC"/>
+  <rect x="12" y="5" width="8" height="6" rx="1" fill="#C7D2FE"/>
+  <!-- Wave -->
+  <path d="M 4 24 Q 10 21, 16 24 T 28 24" stroke="#818CF8" stroke-width="2" fill="none"/>
+</svg>

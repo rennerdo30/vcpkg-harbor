@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - vcpkg-harbor{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Stats Overview -->
+    <div id="stats-summary" hx-get="/partials/stats-summary" hx-trigger="every 30s" hx-swap="innerHTML">
+        {% include "partials/stats_summary.html" %}
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Recent Packages -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-gray-900">Recent Packages</h2>
+                <span class="htmx-indicator text-gray-400 text-sm">Loading...</span>
+            </div>
+            <div id="recent-packages" hx-get="/partials/recent-packages" hx-trigger="every 30s" hx-swap="innerHTML">
+                {% include "partials/recent_packages.html" %}
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Cache Performance</h2>
+            </div>
+            <div class="p-6">
+                <dl class="space-y-4">
+                    <div class="flex justify-between">
+                        <dt class="text-gray-600">Hit Rate</dt>
+                        <dd class="font-semibold {% if cache_stats.hit_rate > 80 %}text-green-600{% elif cache_stats.hit_rate > 50 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                            {{ "%.1f"|format(cache_stats.hit_rate) }}%
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-600">Total Downloads</dt>
+                        <dd class="font-semibold text-gray-900">{{ cache_stats.downloads }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-600">Total Uploads</dt>
+                        <dd class="font-semibold text-gray-900">{{ cache_stats.uploads }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-600">Errors</dt>
+                        <dd class="font-semibold {% if cache_stats.errors > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                            {{ cache_stats.errors }}
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-600">Storage Backend</dt>
+                        <dd class="font-semibold text-gray-900">{{ cache_stats.backend_type }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <!-- Usage Instructions -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Quick Start</h2>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-600 mb-4">Configure vcpkg to use this binary cache:</p>
+            <div class="bg-gray-800 rounded-lg p-4 overflow-x-auto">
+                <code class="text-green-400 text-sm">
+                    export VCPKG_BINARY_SOURCES="http,http://{{ request.headers.get('host', 'localhost:15151') }}/{'{name}'}/{'{version}'}/{'{sha}'}"
+                </code>
+            </div>
+            <p class="text-gray-500 text-sm mt-4">
+                Then run <code class="bg-gray-100 px-1 rounded">vcpkg install &lt;package&gt;</code> to automatically cache binaries.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

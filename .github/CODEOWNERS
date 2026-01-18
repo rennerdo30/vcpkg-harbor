@@ -1,0 +1,19 @@
+# Default owners
+* @rennerdo30
+
+# Core components
+/src/vcpkg_harbor/core/ @rennerdo30
+/src/vcpkg_harbor/api/ @rennerdo30
+/src/vcpkg_harbor/storage/ @rennerdo30
+
+# Documentation
+/docs/ @rennerdo30
+*.md @rennerdo30
+
+# CI/CD
+/.github/ @rennerdo30
+
+# Build and packaging
+pyproject.toml @rennerdo30
+Dockerfile @rennerdo30
+docker-compose*.yml @rennerdo30

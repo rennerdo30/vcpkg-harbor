@@ -7,13 +7,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy project files
+COPY pyproject.toml .
+COPY src/ src/
 
-# Copy application code
-COPY main.py .
-COPY .env .
+# Install the package
+RUN pip install --no-cache-dir .
 
 # Create logs directory
 RUN mkdir -p logs
@@ -25,7 +24,10 @@ USER vcpkg
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${VCPKG_PORT:-15151}/health || exit 1
+    CMD curl -f http://localhost:${VCPKG_SERVER_PORT:-15151}/health || exit 1
+
+# Expose default port
+EXPOSE 15151
 
 # Run the application
-CMD ["python", "main.py"]
+CMD ["vcpkg-harbor"]

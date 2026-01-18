@@ -6,20 +6,31 @@ services:
     ports:
       - "15151:15151"
     environment:
-      - VCPKG_HOST=0.0.0.0
-      - VCPKG_PORT=15151
-      - VCPKG_WORKERS=4
+      # Server settings
+      - VCPKG_SERVER_HOST=0.0.0.0
+      - VCPKG_SERVER_PORT=15151
+      - VCPKG_SERVER_WORKERS=4
+      # Storage settings
+      - VCPKG_STORAGE_TYPE=minio
+      # MinIO settings
       - VCPKG_MINIO_ENDPOINT=minio:9000
       - VCPKG_MINIO_ACCESS_KEY=minioadmin
       - VCPKG_MINIO_SECRET_KEY=minioadmin
       - VCPKG_MINIO_BUCKET=vcpkg-harbor
       - VCPKG_MINIO_SECURE=false
+      # Logging settings
       - VCPKG_LOG_LEVEL=INFO
       - VCPKG_LOG_JSON=true
+      - VCPKG_LOG_FILE=/app/logs/vcpkg-harbor.log
+      # Dashboard settings
+      - VCPKG_DASHBOARD_ENABLED=true
+      # Metrics settings
+      - VCPKG_METRICS_ENABLED=true
     volumes:
       - ./logs:/app/logs
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:15151/health"]

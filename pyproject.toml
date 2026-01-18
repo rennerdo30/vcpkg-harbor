@@ -1,0 +1,93 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vcpkg-harbor"
+version = "2.0.0"
+description = "A binary cache server for vcpkg with plugin-based storage backends"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    { name = "vcpkg-harbor contributors" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Build Tools",
+]
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "structlog>=24.0.0",
+    "minio>=7.2.0",
+    "jinja2>=3.1.0",
+    "python-multipart>=0.0.9",
+    "httpx>=0.27.0",
+    "prometheus-client>=0.20.0",
+    "aiofiles>=24.0.0",
+    "boto3>=1.34.0",
+    "azure-storage-blob>=12.0.0",
+    "google-cloud-storage>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0.0",
+    "httpx>=0.27.0",
+    "ruff>=0.3.0",
+    "mypy>=1.9.0",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.24.0",
+]
+
+[project.scripts]
+vcpkg-harbor = "vcpkg_harbor.__main__:main"
+
+[project.entry-points."vcpkg_harbor.storage"]
+minio = "vcpkg_harbor.storage.backends.minio:MinioBackend"
+filesystem = "vcpkg_harbor.storage.backends.filesystem:FilesystemBackend"
+s3 = "vcpkg_harbor.storage.backends.s3:S3Backend"
+azure = "vcpkg_harbor.storage.backends.azure:AzureBackend"
+gcs = "vcpkg_harbor.storage.backends.gcs:GCSBackend"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vcpkg_harbor"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --cov=vcpkg_harbor --cov-report=term-missing"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true

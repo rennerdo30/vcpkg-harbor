@@ -1,187 +1,165 @@
-# vcpkg-harbor
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="vcpkg-harbor logo" width="200">
+</p>
 
-A binary cache server for vcpkg, Microsoft's C++ package manager.
+<h1 align="center">vcpkg-harbor</h1>
+
+<p align="center">
+  <strong>A high-performance binary cache server for <a href="https://github.com/microsoft/vcpkg">vcpkg</a></strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/rennerdo30/vcpkg-harbor/actions/workflows/ci.yml"><img src="https://github.com/rennerdo30/vcpkg-harbor/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/rennerdo30/vcpkg-harbor/actions/workflows/docker-image.yml"><img src="https://github.com/rennerdo30/vcpkg-harbor/actions/workflows/docker-image.yml/badge.svg" alt="Docker"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
+  <a href="https://pypi.org/project/vcpkg-harbor/"><img src="https://img.shields.io/pypi/v/vcpkg-harbor.svg" alt="PyPI version"></a>
+</p>
+
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#documentation">Documentation</a> •
+  <a href="#contributing">Contributing</a>
+</p>
+
+---
+
+vcpkg-harbor caches compiled C++ packages, allowing teams to share pre-built binaries and dramatically reduce build times. It supports multiple storage backends and provides a web dashboard for monitoring.
 
 ## Features
 
-- Binary package caching using MinIO storage backend
-- Streaming uploads and downloads
-- Environment-based configuration
-- Comprehensive logging
-- Docker support
-- Multi-worker deployment support
-- Read-only and write-only modes
+- 🚀 **Multiple Storage Backends** - MinIO, AWS S3, Azure Blob, Google Cloud Storage, or local filesystem
+- 🔌 **Plugin Architecture** - Easy to add custom storage backends via entry points
+- 📊 **Web Dashboard** - Monitor cache statistics and browse packages in real-time
+- 📈 **Prometheus Metrics** - Built-in metrics endpoint for monitoring and alerting
+- 🔐 **Authentication** - Token and HTTP Basic authentication support
+- ⚡ **High Performance** - Async Python with streaming uploads/downloads
+- 🐳 **Docker Ready** - Production-ready Docker images and compose files
 
-## Prerequisites
+## Quick Start
 
-- Python 3.8+
-- MinIO server (can be run via Docker)
-- Docker (optional, for containerized deployment)
+### Option 1: Using pip (Simplest)
 
-## Installation
-
-### Local Development Setup
-
-1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/vcpkg-harbor.git
+# Install vcpkg-harbor
+pip install vcpkg-harbor
+
+# Start with filesystem storage (default)
+vcpkg-harbor
+```
+
+### Option 2: Using Docker
+
+```bash
+# Simple deployment (filesystem storage)
+docker run -d -p 15151:15151 -v vcpkg-cache:/app/cache \
+  ghcr.io/rennerdo30/vcpkg-harbor:latest
+
+# Or with Docker Compose (includes MinIO)
+git clone https://github.com/rennerdo30/vcpkg-harbor.git
 cd vcpkg-harbor
-```
-
-2. Create a virtual environment:
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# OR
-.venv\Scripts\activate     # Windows
-```
-
-3. Install dependencies:
-```bash
-pip install fastapi uvicorn minio pydantic-settings
-```
-
-### Docker Setup
-
-1. Using docker-compose:
-```bash
 docker-compose up -d
 ```
 
-2. Using Docker directly:
+### Option 3: From Source
+
 ```bash
-docker build -t vcpkg-harbor .
-docker run -d -p 15151:15151 vcpkg-harbor
-```
-
-## Configuration
-
-Create a `.env` file in the project root:
-
-```env
-# Server settings
-VCPKG_HOST=0.0.0.0
-VCPKG_PORT=15151
-VCPKG_WORKERS=4
-VCPKG_READ_ONLY=false
-VCPKG_WRITE_ONLY=false
-
-# Storage settings
-VCPKG_STORAGE_TYPE=minio
-VCPKG_STORAGE_PATH=./cache
-
-# MinIO settings
-VCPKG_MINIO_ENDPOINT=localhost:9000
-VCPKG_MINIO_ACCESS_KEY=minioadmin
-VCPKG_MINIO_SECRET_KEY=minioadmin
-VCPKG_MINIO_BUCKET=vcpkg-harbor
-VCPKG_MINIO_SECURE=false
-
-# Logging settings
-VCPKG_LOG_LEVEL=INFO
-VCPKG_LOG_JSON=false
-VCPKG_LOG_FILE=logs/vcpkg-harbor.log
-VCPKG_LOG_RETENTION_DAYS=30
-```
-
-## Usage
-
-### Starting the Server
-
-#### Using Scripts
-
-Linux/Mac:
-```bash
+git clone https://github.com/rennerdo30/vcpkg-harbor.git
+cd vcpkg-harbor
 ./run.sh
 ```
 
-Windows:
-```bash
-run.bat
-```
-
-#### Manual Start
+### Configure vcpkg
 
 ```bash
-python main.py
-```
-
-### Configuring vcpkg
-
-Add the binary cache to your vcpkg configuration:
-
-```bash
+# Set environment variable
 export VCPKG_BINARY_SOURCES="http,http://localhost:15151/{name}/{version}/{sha}"
+
+# Install packages (binaries will be cached)
+vcpkg install zlib boost
 ```
 
-### API Endpoints
+## Storage Backends
 
-1. Check Package Existence:
+| Backend | Use Case | Configuration |
+|---------|----------|---------------|
+| **Filesystem** (default) | Development, small teams | `VCPKG_STORAGE_TYPE=filesystem` |
+| **MinIO** | On-premises, S3-compatible | `VCPKG_STORAGE_TYPE=minio` |
+| **AWS S3** | AWS deployments | `VCPKG_STORAGE_TYPE=s3` |
+| **Azure Blob** | Azure deployments | `VCPKG_STORAGE_TYPE=azure` |
+| **Google Cloud Storage** | GCP deployments | `VCPKG_STORAGE_TYPE=gcs` |
+
+## Configuration
+
+vcpkg-harbor is configured via environment variables:
+
 ```bash
-HEAD /{name}/{version}/{sha}
+# Server
+VCPKG_SERVER_HOST=0.0.0.0
+VCPKG_SERVER_PORT=15151
+
+# Storage (filesystem is default)
+VCPKG_STORAGE_TYPE=filesystem
+VCPKG_STORAGE_PATH=./cache
+
+# Logging
+VCPKG_LOG_LEVEL=INFO
+
+# Authentication (optional)
+VCPKG_AUTH_ENABLED=true
+VCPKG_AUTH_TYPE=token
+VCPKG_AUTH_TOKEN=your-secret-token
 ```
 
-2. Download Package:
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/{name}/{version}/{sha}` | HEAD | Check if package exists |
+| `/{name}/{version}/{sha}` | GET | Download package |
+| `/{name}/{version}/{sha}` | PUT | Upload package |
+| `/health` | GET | Health check |
+| `/metrics` | GET | Prometheus metrics |
+| `/` | GET | Web dashboard |
+
+## Documentation
+
+📚 **[Full Documentation](https://rennerdo30.github.io/vcpkg-harbor/)**
+
+- [Installation](https://rennerdo30.github.io/vcpkg-harbor/getting-started/installation/)
+- [Quick Start](https://rennerdo30.github.io/vcpkg-harbor/getting-started/quickstart/)
+- [Configuration](https://rennerdo30.github.io/vcpkg-harbor/getting-started/configuration/)
+- [Storage Backends](https://rennerdo30.github.io/vcpkg-harbor/user-guide/storage-backends/)
+- [Docker Deployment](https://rennerdo30.github.io/vcpkg-harbor/deployment/docker/)
+- [Kubernetes Deployment](https://rennerdo30.github.io/vcpkg-harbor/deployment/kubernetes/)
+
+## Development
+
 ```bash
-GET /{name}/{version}/{sha}
+# Setup development environment
+./scripts/setup-dev.sh
+
+# Start development server
+./scripts/dev-server.sh
+
+# Run tests
+./scripts/test.sh
+
+# Run linter
+./scripts/lint.sh
 ```
-
-3. Upload Package:
-```bash
-PUT /{name}/{version}/{sha}
-```
-
-## Testing
-
-1. Start MinIO:
-```bash
-docker run -d -p 9000:9000 -p 9001:9001 minio/minio server /data
-```
-
-2. Start vcpkg-harbor:
-```bash
-python main.py
-```
-
-3. Configure vcpkg:
-```bash
-export VCPKG_BINARY_SOURCES="http,http://localhost:15151/{name}/{version}/{sha}"
-```
-
-4. Test with vcpkg:
-```bash
-vcpkg install some-package
-```
-
-## Production Deployment
-
-For production deployment, consider:
-
-1. Enable SSL/TLS
-2. Configure proper authentication
-3. Use a production-grade MinIO setup
-4. Set up monitoring and alerting
-5. Configure proper logging
-6. Use a reverse proxy (e.g., nginx)
-
-## Logs
-
-Logs are stored in `logs/vcpkg-harbor.log` by default. The logging system features:
-
-- Log rotation (daily)
-- Configurable retention period
-- JSON format support
-- Multiple log levels
-- Console and file output
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [vcpkg](https://github.com/microsoft/vcpkg) - C++ package manager by Microsoft
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
+- [MinIO](https://min.io/) - High-performance object storage

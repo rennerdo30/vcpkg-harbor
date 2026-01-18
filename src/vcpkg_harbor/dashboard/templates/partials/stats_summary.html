@@ -1,0 +1,18 @@
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-indigo-500">
+        <p class="text-gray-500 text-sm">Total Packages</p>
+        <p class="text-3xl font-bold text-gray-900">{{ cache_stats.total_packages }}</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+        <p class="text-gray-500 text-sm">Storage Used</p>
+        <p class="text-3xl font-bold text-gray-900">{{ cache_stats.total_size_human }}</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+        <p class="text-gray-500 text-sm">Total Requests</p>
+        <p class="text-3xl font-bold text-gray-900">{{ request_stats.total_requests }}</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
+        <p class="text-gray-500 text-sm">Avg Response</p>
+        <p class="text-3xl font-bold text-gray-900">{{ "%.1f"|format(request_stats.avg_response_time_ms) }}ms</p>
+    </div>
+</div>
