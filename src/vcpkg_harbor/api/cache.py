@@ -19,11 +19,12 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["cache"])
 
 
-@router.head("/{name}/{version}/{sha}")
+@router.head("/{name}/{version}/{sha}/{triplet}")
 async def check_package(
     name: str,
     version: str,
     sha: str,
+    triplet: str,
     cache_service: CacheServiceDep,
     stats_service: StatsServiceDep,
 ) -> Response:
@@ -46,7 +47,7 @@ async def check_package(
     start_time = time.time()
 
     try:
-        exists = await cache_service.check_exists(name, version, sha)
+        exists = await cache_service.check_exists(name, version, sha, triplet)
 
         if exists:
             stats_service.record_cache_hit()
@@ -54,7 +55,7 @@ async def check_package(
 
             # Get package info for headers
             try:
-                info = await cache_service.get_package_info(name, version, sha)
+                info = await cache_service.get_package_info(name, version, sha, triplet)
                 response = Response(status_code=200)
                 response.headers["Content-Length"] = str(info.size)
                 if info.etag:
@@ -71,18 +72,19 @@ async def check_package(
         raise
     except Exception as e:
         stats_service.record_error()
-        logger.error("Error checking package", name=name, version=version, sha=sha, error=str(e))
+        logger.error("Error checking package", name=name, version=version, sha=sha, triplet=triplet, error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         elapsed = (time.time() - start_time) * 1000
         stats_service.record_request_time(elapsed)
 
 
-@router.get("/{name}/{version}/{sha}")
+@router.get("/{name}/{version}/{sha}/{triplet}")
 async def download_package(
     name: str,
     version: str,
     sha: str,
+    triplet: str,
     cache_service: CacheServiceDep,
     stats_service: StatsServiceDep,
 ) -> StreamingResponse:
@@ -105,7 +107,7 @@ async def download_package(
     try:
         # Get package info for headers
         try:
-            info = await cache_service.get_package_info(name, version, sha)
+            info = await cache_service.get_package_info(name, version, sha, triplet)
             headers = {
                 "Content-Length": str(info.size),
                 "Content-Type": "application/octet-stream",
@@ -120,7 +122,7 @@ async def download_package(
         # Stream the package content
         async def stream_package() -> AsyncIterator[bytes]:
             try:
-                async for chunk in cache_service.get_package(name, version, sha):
+                async for chunk in cache_service.get_package(name, version, sha, triplet):
                     yield chunk
                 stats_service.record_download()
                 stats_service.record_cache_hit()
@@ -141,18 +143,19 @@ async def download_package(
         raise HTTPException(status_code=404, detail="Package not found")
     except Exception as e:
         stats_service.record_error()
-        logger.error("Error downloading package", name=name, version=version, sha=sha, error=str(e))
+        logger.error("Error downloading package", name=name, version=version, sha=sha, triplet=triplet, error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         elapsed = (time.time() - start_time) * 1000
         stats_service.record_request_time(elapsed)
 
 
-@router.put("/{name}/{version}/{sha}")
+@router.put("/{name}/{version}/{sha}/{triplet}")
 async def upload_package(
     name: str,
     version: str,
     sha: str,
+    triplet: str,
     request: Request,
     cache_service: CacheServiceDep,
     stats_service: StatsServiceDep,
@@ -165,6 +168,7 @@ async def upload_package(
         name: Package name
         version: Package version
         sha: Package SHA hash
+        triplet: Target triplet (e.g., x64-linux, x64-windows)
         request: FastAPI request object
         cache_service: Injected cache service
         stats_service: Injected stats service
@@ -186,7 +190,7 @@ async def upload_package(
 
         # Store the package
         package_info = await cache_service.put_package(
-            name, version, sha, request_stream(), size
+            name, version, sha, triplet, request_stream(), size
         )
 
         stats_service.record_upload()
@@ -196,6 +200,7 @@ async def upload_package(
             "name": name,
             "version": version,
             "sha": sha,
+            "triplet": triplet,
             "size": package_info.size,
             "etag": package_info.etag,
         }
@@ -210,18 +215,19 @@ async def upload_package(
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         stats_service.record_error()
-        logger.error("Error uploading package", name=name, version=version, sha=sha, error=str(e))
+        logger.error("Error uploading package", name=name, version=version, sha=sha, triplet=triplet, error=str(e))
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
     finally:
         elapsed = (time.time() - start_time) * 1000
         stats_service.record_request_time(elapsed)
 
 
-@router.delete("/{name}/{version}/{sha}")
+@router.delete("/{name}/{version}/{sha}/{triplet}")
 async def delete_package(
     name: str,
     version: str,
     sha: str,
+    triplet: str,
     cache_service: CacheServiceDep,
     stats_service: StatsServiceDep,
 ) -> dict:
@@ -242,10 +248,10 @@ async def delete_package(
     start_time = time.time()
 
     try:
-        deleted = await cache_service.delete_package(name, version, sha)
+        deleted = await cache_service.delete_package(name, version, sha, triplet)
 
         if deleted:
-            return {"status": "deleted", "name": name, "version": version, "sha": sha}
+            return {"status": "deleted", "name": name, "version": version, "sha": sha, "triplet": triplet}
         else:
             raise HTTPException(status_code=404, detail="Package not found")
 
@@ -258,7 +264,7 @@ async def delete_package(
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         stats_service.record_error()
-        logger.error("Error deleting package", name=name, version=version, sha=sha, error=str(e))
+        logger.error("Error deleting package", name=name, version=version, sha=sha, triplet=triplet, error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         elapsed = (time.time() - start_time) * 1000

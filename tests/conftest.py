@@ -1,5 +1,6 @@
 """Pytest fixtures for vcpkg-harbor tests."""
 
+import shutil
 import pytest
 from fastapi.testclient import TestClient
 
@@ -28,5 +29,19 @@ def app(settings: Settings):
 
 @pytest.fixture
 def client(app) -> TestClient:
-    """Create test client."""
-    return TestClient(app)
+    """Create test client with lifespan context."""
+    # Clean up test directory before tests
+    import shutil
+    from pathlib import Path
+    test_path = Path("/tmp/vcpkg-harbor-test")
+    if test_path.exists():
+        shutil.rmtree(test_path)
+    test_path.mkdir(parents=True, exist_ok=True)
+    
+    # Use context manager to trigger lifespan events
+    with TestClient(app) as client:
+        yield client
+    
+    # Clean up after tests
+    if test_path.exists():
+        shutil.rmtree(test_path)

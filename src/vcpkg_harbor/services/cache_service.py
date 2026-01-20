@@ -33,25 +33,26 @@ class CacheService:
         self._read_only = settings.server.read_only
         self._write_only = settings.server.write_only
 
-    async def check_exists(self, name: str, version: str, sha: str) -> bool:
+    async def check_exists(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Check if a package exists in the cache.
 
         Args:
             name: Package name
             version: Package version
             sha: Package SHA hash
+            triplet: Target triplet (e.g., x64-linux, x64-windows)
 
         Returns:
             True if package exists, False otherwise
         """
-        logger.debug("Checking package existence", name=name, version=version, sha=sha)
+        logger.debug("Checking package existence", name=name, version=version, sha=sha, triplet=triplet)
 
         try:
-            exists = await self.storage.exists(name, version, sha)
+            exists = await self.storage.exists(name, version, sha, triplet)
             if exists:
-                logger.info("Package exists", name=name, version=version, sha=sha)
+                logger.info("Package exists", name=name, version=version, sha=sha, triplet=triplet)
             else:
-                logger.info("Package not found", name=name, version=version, sha=sha)
+                logger.info("Package not found", name=name, version=version, sha=sha, triplet=triplet)
             return exists
         except Exception as e:
             logger.error(
@@ -59,12 +60,13 @@ class CacheService:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 error=str(e),
             )
             raise StorageError(f"Error checking package existence: {e}", cause=e)
 
     async def get_package(
-        self, name: str, version: str, sha: str
+        self, name: str, version: str, sha: str, triplet: str
     ) -> AsyncIterator[bytes]:
         """Get a package from the cache.
 
@@ -72,6 +74,7 @@ class CacheService:
             name: Package name
             version: Package version
             sha: Package SHA hash
+            triplet: Target triplet (e.g., x64-linux, x64-windows)
 
         Yields:
             Package data chunks
@@ -86,17 +89,18 @@ class CacheService:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
             )
-            raise PackageNotFoundError(name, version, sha)
+            raise PackageNotFoundError(name, version, sha, triplet)
 
-        logger.info("Downloading package", name=name, version=version, sha=sha)
+        logger.info("Downloading package", name=name, version=version, sha=sha, triplet=triplet)
 
         try:
-            async for chunk in self.storage.get(name, version, sha):
+            async for chunk in self.storage.get(name, version, sha, triplet):
                 yield chunk
-            logger.info("Package download complete", name=name, version=version, sha=sha)
+            logger.info("Package download complete", name=name, version=version, sha=sha, triplet=triplet)
         except PackageNotFoundError:
-            logger.warning("Package not found", name=name, version=version, sha=sha)
+            logger.warning("Package not found", name=name, version=version, sha=sha, triplet=triplet)
             raise
         except Exception as e:
             logger.error(
@@ -104,6 +108,7 @@ class CacheService:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 error=str(e),
             )
             raise StorageError(f"Error downloading package: {e}", cause=e)
@@ -113,6 +118,7 @@ class CacheService:
         name: str,
         version: str,
         sha: str,
+        triplet: str,
         data: AsyncIterator[bytes],
         size: int | None = None,
     ) -> PackageInfo:
@@ -122,6 +128,7 @@ class CacheService:
             name: Package name
             version: Package version
             sha: Package SHA hash
+            triplet: Target triplet (e.g., x64-linux, x64-windows)
             data: Async iterator of package data
             size: Optional total size of the package
 
@@ -138,23 +145,25 @@ class CacheService:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
             )
             raise StorageError("Server is in read-only mode")
 
-        logger.info("Uploading package", name=name, version=version, sha=sha, size=size)
+        logger.info("Uploading package", name=name, version=version, sha=sha, triplet=triplet, size=size)
 
         try:
-            package_info = await self.storage.put(name, version, sha, data, size)
+            package_info = await self.storage.put(name, version, sha, triplet, data, size)
             logger.info(
                 "Package uploaded successfully",
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 size=package_info.size,
             )
             return package_info
         except PackageAlreadyExistsError:
-            logger.warning("Package already exists", name=name, version=version, sha=sha)
+            logger.warning("Package already exists", name=name, version=version, sha=sha, triplet=triplet)
             raise
         except Exception as e:
             logger.error(
@@ -162,17 +171,19 @@ class CacheService:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 error=str(e),
             )
             raise StorageError(f"Error uploading package: {e}", cause=e)
 
-    async def delete_package(self, name: str, version: str, sha: str) -> bool:
+    async def delete_package(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Delete a package from the cache.
 
         Args:
             name: Package name
             version: Package version
             sha: Package SHA hash
+            triplet: Target triplet (e.g., x64-linux, x64-windows)
 
         Returns:
             True if package was deleted, False if it didn't exist
@@ -186,17 +197,18 @@ class CacheService:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
             )
             raise StorageError("Server is in read-only mode")
 
-        logger.info("Deleting package", name=name, version=version, sha=sha)
+        logger.info("Deleting package", name=name, version=version, sha=sha, triplet=triplet)
 
         try:
-            deleted = await self.storage.delete(name, version, sha)
+            deleted = await self.storage.delete(name, version, sha, triplet)
             if deleted:
-                logger.info("Package deleted", name=name, version=version, sha=sha)
+                logger.info("Package deleted", name=name, version=version, sha=sha, triplet=triplet)
             else:
-                logger.info("Package not found for deletion", name=name, version=version, sha=sha)
+                logger.info("Package not found for deletion", name=name, version=version, sha=sha, triplet=triplet)
             return deleted
         except Exception as e:
             logger.error(
@@ -204,17 +216,19 @@ class CacheService:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 error=str(e),
             )
             raise StorageError(f"Error deleting package: {e}", cause=e)
 
-    async def get_package_info(self, name: str, version: str, sha: str) -> PackageInfo:
+    async def get_package_info(self, name: str, version: str, sha: str, triplet: str) -> PackageInfo:
         """Get package information without downloading.
 
         Args:
             name: Package name
             version: Package version
             sha: Package SHA hash
+            triplet: Target triplet (e.g., x64-linux, x64-windows)
 
         Returns:
             PackageInfo with package metadata
@@ -222,4 +236,4 @@ class CacheService:
         Raises:
             PackageNotFoundError: If the package doesn't exist
         """
-        return await self.storage.stat(name, version, sha)
+        return await self.storage.stat(name, version, sha, triplet)

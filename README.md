@@ -74,7 +74,7 @@ cd vcpkg-harbor
 
 ```bash
 # Set environment variable
-export VCPKG_BINARY_SOURCES="http,http://localhost:15151/{name}/{version}/{sha}"
+export VCPKG_BINARY_SOURCES="clear;http,http://localhost:15151/{name}/{version}/{sha}/{triplet},readwrite"
 
 # Install packages (binaries will be cached)
 vcpkg install zlib boost
@@ -116,9 +116,9 @@ VCPKG_AUTH_TOKEN=your-secret-token
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/{name}/{version}/{sha}` | HEAD | Check if package exists |
-| `/{name}/{version}/{sha}` | GET | Download package |
-| `/{name}/{version}/{sha}` | PUT | Upload package |
+| `/{name}/{version}/{sha}/{triplet}` | HEAD | Check if package exists |
+| `/{name}/{version}/{sha}/{triplet}` | GET | Download package |
+| `/{name}/{version}/{sha}/{triplet}` | PUT | Upload package |
 | `/health` | GET | Health check |
 | `/metrics` | GET | Prometheus metrics |
 | `/` | GET | Web dashboard |

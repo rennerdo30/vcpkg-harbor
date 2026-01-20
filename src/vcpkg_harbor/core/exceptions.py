@@ -12,21 +12,23 @@ class VcpkgHarborError(Exception):
 class PackageNotFoundError(VcpkgHarborError):
     """Raised when a package is not found in the cache."""
 
-    def __init__(self, name: str, version: str, sha: str) -> None:
+    def __init__(self, name: str, version: str, sha: str, triplet: str) -> None:
         self.name = name
         self.version = version
         self.sha = sha
-        super().__init__(f"Package not found: {name}/{version}/{sha}")
+        self.triplet = triplet
+        super().__init__(f"Package not found: {name}/{version}/{sha}/{triplet}")
 
 
 class PackageAlreadyExistsError(VcpkgHarborError):
     """Raised when trying to upload a package that already exists."""
 
-    def __init__(self, name: str, version: str, sha: str) -> None:
+    def __init__(self, name: str, version: str, sha: str, triplet: str) -> None:
         self.name = name
         self.version = version
         self.sha = sha
-        super().__init__(f"Package already exists: {name}/{version}/{sha}")
+        self.triplet = triplet
+        super().__init__(f"Package already exists: {name}/{version}/{sha}/{triplet}")
 
 
 class StorageError(VcpkgHarborError):

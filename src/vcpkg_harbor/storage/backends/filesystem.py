@@ -32,9 +32,9 @@ class FilesystemBackend:
         """
         self.base_path = Path(path).resolve()
 
-    def _get_package_path(self, name: str, version: str, sha: str) -> Path:
+    def _get_package_path(self, name: str, version: str, sha: str, triplet: str) -> Path:
         """Get the full path for a package."""
-        return self.base_path / name / version / sha
+        return self.base_path / name / version / sha / triplet
 
     async def initialize(self) -> None:
         """Initialize the filesystem backend."""
@@ -51,19 +51,19 @@ class FilesystemBackend:
         """Close the filesystem backend (no-op for filesystem)."""
         logger.debug("Closing filesystem backend")
 
-    async def exists(self, name: str, version: str, sha: str) -> bool:
+    async def exists(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Check if a package exists."""
-        package_path = self._get_package_path(name, version, sha)
+        package_path = self._get_package_path(name, version, sha, triplet)
         return package_path.exists()
 
-    async def get(self, name: str, version: str, sha: str) -> AsyncIterator[bytes]:
+    async def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
         """Get a package as an async iterator of bytes."""
-        package_path = self._get_package_path(name, version, sha)
+        package_path = self._get_package_path(name, version, sha, triplet)
         logger.debug("Getting package", path=str(package_path))
 
         if not package_path.exists():
             logger.warning("Package not found", path=str(package_path))
-            raise PackageNotFoundError(name, version, sha)
+            raise PackageNotFoundError(name, version, sha, triplet)
 
         try:
             async with aiofiles.open(package_path, "rb") as f:
@@ -82,17 +82,18 @@ class FilesystemBackend:
         name: str,
         version: str,
         sha: str,
+        triplet: str,
         data: AsyncIterator[bytes],
         size: int | None = None,
     ) -> PackageInfo:
         """Store a package."""
-        package_path = self._get_package_path(name, version, sha)
+        package_path = self._get_package_path(name, version, sha, triplet)
         logger.debug("Putting package", path=str(package_path))
 
         # Check if already exists
         if package_path.exists():
             logger.warning("Package already exists", path=str(package_path))
-            raise PackageAlreadyExistsError(name, version, sha)
+            raise PackageAlreadyExistsError(name, version, sha, triplet)
 
         try:
             # Create parent directories
@@ -115,6 +116,7 @@ class FilesystemBackend:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 size=total_size,
                 etag=etag,
                 created_at=datetime.utcnow(),
@@ -129,9 +131,9 @@ class FilesystemBackend:
             logger.error("Error uploading package", path=str(package_path), error=str(e))
             raise StorageError(f"Error uploading package: {e}", cause=e)
 
-    async def delete(self, name: str, version: str, sha: str) -> bool:
+    async def delete(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Delete a package."""
-        package_path = self._get_package_path(name, version, sha)
+        package_path = self._get_package_path(name, version, sha, triplet)
         logger.debug("Deleting package", path=str(package_path))
 
         if not package_path.exists():
@@ -160,12 +162,12 @@ class FilesystemBackend:
         except Exception:
             pass  # Ignore cleanup errors
 
-    async def stat(self, name: str, version: str, sha: str) -> PackageInfo:
+    async def stat(self, name: str, version: str, sha: str, triplet: str) -> PackageInfo:
         """Get package information."""
-        package_path = self._get_package_path(name, version, sha)
+        package_path = self._get_package_path(name, version, sha, triplet)
 
         if not package_path.exists():
-            raise PackageNotFoundError(name, version, sha)
+            raise PackageNotFoundError(name, version, sha, triplet)
 
         try:
             stat = package_path.stat()
@@ -180,6 +182,7 @@ class FilesystemBackend:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 size=stat.st_size,
                 etag=hasher.hexdigest(),
                 created_at=datetime.fromtimestamp(stat.st_ctime),
@@ -203,7 +206,7 @@ class FilesystemBackend:
         count = 0
 
         try:
-            # Walk directory structure: base/name/version/sha
+            # Walk directory structure: base/name/version/sha/triplet
             for name_dir in sorted(self.base_path.iterdir()):
                 if not name_dir.is_dir():
                     continue
@@ -216,27 +219,32 @@ class FilesystemBackend:
                     if not version_dir.is_dir():
                         continue
 
-                    for sha_file in sorted(version_dir.iterdir()):
-                        if not sha_file.is_file():
+                    for sha_dir in sorted(version_dir.iterdir()):
+                        if not sha_dir.is_dir():
                             continue
 
-                        count += 1
-                        if count <= offset:
-                            continue
+                        for triplet_file in sorted(sha_dir.iterdir()):
+                            if not triplet_file.is_file():
+                                continue
 
-                        stat = sha_file.stat()
-                        packages.append(
-                            PackageInfo(
-                                name=name_dir.name,
-                                version=version_dir.name,
-                                sha=sha_file.name,
-                                size=stat.st_size,
-                                created_at=datetime.fromtimestamp(stat.st_ctime),
+                            count += 1
+                            if count <= offset:
+                                continue
+
+                            stat = triplet_file.stat()
+                            packages.append(
+                                PackageInfo(
+                                    name=name_dir.name,
+                                    version=version_dir.name,
+                                    sha=sha_dir.name,
+                                    triplet=triplet_file.name,
+                                    size=stat.st_size,
+                                    created_at=datetime.fromtimestamp(stat.st_ctime),
+                                )
                             )
-                        )
 
-                        if limit and len(packages) >= limit:
-                            return packages
+                            if limit and len(packages) >= limit:
+                                return packages
 
             return packages
 

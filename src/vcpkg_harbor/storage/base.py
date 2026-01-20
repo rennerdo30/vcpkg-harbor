@@ -13,6 +13,7 @@ class PackageInfo:
     name: str
     version: str
     sha: str
+    triplet: str
     size: int
     etag: str | None = None
     content_type: str = "application/octet-stream"
@@ -22,7 +23,7 @@ class PackageInfo:
     @property
     def object_path(self) -> str:
         """Get the storage object path."""
-        return f"{self.name}/{self.version}/{self.sha}"
+        return f"{self.name}/{self.version}/{self.sha}/{self.triplet}"
 
 
 @runtime_checkable
@@ -48,13 +49,14 @@ class StorageBackend(Protocol):
         ...
 
     @abstractmethod
-    async def exists(self, name: str, version: str, sha: str) -> bool:
+    async def exists(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Check if a package exists in storage.
 
         Args:
             name: Package name
             version: Package version
             sha: Package SHA hash
+            triplet: Target triplet (e.g., x64-linux, x64-windows)
 
         Returns:
             True if package exists, False otherwise
@@ -62,13 +64,14 @@ class StorageBackend(Protocol):
         ...
 
     @abstractmethod
-    async def get(self, name: str, version: str, sha: str) -> AsyncIterator[bytes]:
+    async def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
         """Get a package from storage as an async iterator.
 
         Args:
             name: Package name
             version: Package version
             sha: Package SHA hash
+            triplet: Target triplet (e.g., x64-linux, x64-windows)
 
         Yields:
             Chunks of package data
@@ -84,6 +87,7 @@ class StorageBackend(Protocol):
         name: str,
         version: str,
         sha: str,
+        triplet: str,
         data: AsyncIterator[bytes],
         size: int | None = None,
     ) -> PackageInfo:
@@ -93,6 +97,7 @@ class StorageBackend(Protocol):
             name: Package name
             version: Package version
             sha: Package SHA hash
+            triplet: Target triplet (e.g., x64-linux, x64-windows)
             data: Async iterator of package data chunks
             size: Optional total size of the package
 
@@ -106,13 +111,14 @@ class StorageBackend(Protocol):
         ...
 
     @abstractmethod
-    async def delete(self, name: str, version: str, sha: str) -> bool:
+    async def delete(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Delete a package from storage.
 
         Args:
             name: Package name
             version: Package version
             sha: Package SHA hash
+            triplet: Target triplet (e.g., x64-linux, x64-windows)
 
         Returns:
             True if package was deleted, False if it didn't exist
@@ -120,13 +126,14 @@ class StorageBackend(Protocol):
         ...
 
     @abstractmethod
-    async def stat(self, name: str, version: str, sha: str) -> PackageInfo:
+    async def stat(self, name: str, version: str, sha: str, triplet: str) -> PackageInfo:
         """Get information about a package without downloading it.
 
         Args:
             name: Package name
             version: Package version
             sha: Package SHA hash
+            triplet: Target triplet (e.g., x64-linux, x64-windows)
 
         Returns:
             PackageInfo with package metadata
