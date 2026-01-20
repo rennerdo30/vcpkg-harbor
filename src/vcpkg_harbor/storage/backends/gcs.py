@@ -58,9 +58,9 @@ class GCSBackend:
 
         return self._bucket
 
-    def _get_blob_name(self, name: str, version: str, sha: str) -> str:
+    def _get_blob_name(self, name: str, version: str, sha: str, triplet: str) -> str:
         """Generate blob name from package details."""
-        return f"{name}/{version}/{sha}"
+        return f"{name}/{version}/{sha}/{triplet}"
 
     async def initialize(self) -> None:
         """Initialize the GCS backend and ensure bucket exists."""
@@ -91,9 +91,9 @@ class GCSBackend:
         self._client = None
         self._bucket = None
 
-    async def exists(self, name: str, version: str, sha: str) -> bool:
+    async def exists(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Check if a package exists."""
-        blob_name = self._get_blob_name(name, version, sha)
+        blob_name = self._get_blob_name(name, version, sha, triplet)
 
         try:
             loop = asyncio.get_event_loop()
@@ -102,14 +102,14 @@ class GCSBackend:
         except Exception as e:
             raise StorageError(f"Error checking package existence: {e}", cause=e)
 
-    async def get(self, name: str, version: str, sha: str) -> AsyncIterator[bytes]:
+    async def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
         """Get a package as an async iterator of bytes."""
-        blob_name = self._get_blob_name(name, version, sha)
+        blob_name = self._get_blob_name(name, version, sha, triplet)
         logger.debug("Getting package", blob=blob_name)
 
-        if not await self.exists(name, version, sha):
+        if not await self.exists(name, version, sha, triplet):
             logger.warning("Package not found", blob=blob_name)
-            raise PackageNotFoundError(name, version, sha)
+            raise PackageNotFoundError(name, version, sha, triplet)
 
         try:
             loop = asyncio.get_event_loop()
@@ -132,16 +132,17 @@ class GCSBackend:
         name: str,
         version: str,
         sha: str,
+        triplet: str,
         data: AsyncIterator[bytes],
         size: int | None = None,
     ) -> PackageInfo:
         """Store a package."""
-        blob_name = self._get_blob_name(name, version, sha)
+        blob_name = self._get_blob_name(name, version, sha, triplet)
         logger.debug("Putting package", blob=blob_name)
 
-        if await self.exists(name, version, sha):
+        if await self.exists(name, version, sha, triplet):
             logger.warning("Package already exists", blob=blob_name)
-            raise PackageAlreadyExistsError(name, version, sha)
+            raise PackageAlreadyExistsError(name, version, sha, triplet)
 
         try:
             chunks = []
@@ -166,6 +167,7 @@ class GCSBackend:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 size=actual_size,
                 etag=blob.etag,
                 created_at=datetime.utcnow(),
@@ -177,12 +179,12 @@ class GCSBackend:
             logger.error("Error uploading package", blob=blob_name, error=str(e))
             raise StorageError(f"Error uploading package: {e}", cause=e)
 
-    async def delete(self, name: str, version: str, sha: str) -> bool:
+    async def delete(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Delete a package."""
-        blob_name = self._get_blob_name(name, version, sha)
+        blob_name = self._get_blob_name(name, version, sha, triplet)
         logger.debug("Deleting package", blob=blob_name)
 
-        if not await self.exists(name, version, sha):
+        if not await self.exists(name, version, sha, triplet):
             return False
 
         try:
@@ -195,12 +197,12 @@ class GCSBackend:
             logger.error("Error deleting package", blob=blob_name, error=str(e))
             raise StorageError(f"Error deleting package: {e}", cause=e)
 
-    async def stat(self, name: str, version: str, sha: str) -> PackageInfo:
+    async def stat(self, name: str, version: str, sha: str, triplet: str) -> PackageInfo:
         """Get package information."""
-        blob_name = self._get_blob_name(name, version, sha)
+        blob_name = self._get_blob_name(name, version, sha, triplet)
 
-        if not await self.exists(name, version, sha):
-            raise PackageNotFoundError(name, version, sha)
+        if not await self.exists(name, version, sha, triplet):
+            raise PackageNotFoundError(name, version, sha, triplet)
 
         try:
             loop = asyncio.get_event_loop()
@@ -211,6 +213,7 @@ class GCSBackend:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 size=blob.size or 0,
                 etag=blob.etag,
                 content_type=blob.content_type or "application/octet-stream",
@@ -244,12 +247,13 @@ class GCSBackend:
                     continue
 
                 parts = blob.name.split("/")
-                if len(parts) >= 3:
+                if len(parts) >= 4:
                     packages.append(
                         PackageInfo(
                             name=parts[0],
                             version=parts[1],
                             sha=parts[2],
+                            triplet=parts[3],
                             size=blob.size or 0,
                             etag=blob.etag,
                             created_at=blob.time_created,

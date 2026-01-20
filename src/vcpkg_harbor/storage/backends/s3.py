@@ -64,9 +64,9 @@ class S3Backend:
 
         return self._client
 
-    def _get_object_key(self, name: str, version: str, sha: str) -> str:
+    def _get_object_key(self, name: str, version: str, sha: str, triplet: str) -> str:
         """Generate S3 object key from package details."""
-        return f"{name}/{version}/{sha}"
+        return f"{name}/{version}/{sha}/{triplet}"
 
     async def initialize(self) -> None:
         """Initialize the S3 backend and ensure bucket exists."""
@@ -103,9 +103,9 @@ class S3Backend:
         logger.debug("Closing S3 backend")
         self._client = None
 
-    async def exists(self, name: str, version: str, sha: str) -> bool:
+    async def exists(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Check if a package exists."""
-        key = self._get_object_key(name, version, sha)
+        key = self._get_object_key(name, version, sha, triplet)
 
         try:
             loop = asyncio.get_event_loop()
@@ -119,9 +119,9 @@ class S3Backend:
                 return False
             raise StorageError(f"Error checking package existence: {e}", cause=e)
 
-    async def get(self, name: str, version: str, sha: str) -> AsyncIterator[bytes]:
+    async def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
         """Get a package as an async iterator of bytes."""
-        key = self._get_object_key(name, version, sha)
+        key = self._get_object_key(name, version, sha, triplet)
         logger.debug("Getting package", key=key)
 
         try:
@@ -146,7 +146,7 @@ class S3Backend:
         except Exception as e:
             if "NoSuchKey" in str(e) or "404" in str(e):
                 logger.warning("Package not found", key=key)
-                raise PackageNotFoundError(name, version, sha)
+                raise PackageNotFoundError(name, version, sha, triplet)
             logger.error("Error getting package", key=key, error=str(e))
             raise StorageError(f"Error getting package: {e}", cause=e)
 
@@ -155,16 +155,17 @@ class S3Backend:
         name: str,
         version: str,
         sha: str,
+        triplet: str,
         data: AsyncIterator[bytes],
         size: int | None = None,
     ) -> PackageInfo:
         """Store a package."""
-        key = self._get_object_key(name, version, sha)
+        key = self._get_object_key(name, version, sha, triplet)
         logger.debug("Putting package", key=key)
 
-        if await self.exists(name, version, sha):
+        if await self.exists(name, version, sha, triplet):
             logger.warning("Package already exists", key=key)
-            raise PackageAlreadyExistsError(name, version, sha)
+            raise PackageAlreadyExistsError(name, version, sha, triplet)
 
         try:
             chunks = []
@@ -190,6 +191,7 @@ class S3Backend:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 size=actual_size,
                 etag=result.get("ETag", "").strip('"'),
                 created_at=datetime.utcnow(),
@@ -201,12 +203,12 @@ class S3Backend:
             logger.error("Error uploading package", key=key, error=str(e))
             raise StorageError(f"Error uploading package: {e}", cause=e)
 
-    async def delete(self, name: str, version: str, sha: str) -> bool:
+    async def delete(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Delete a package."""
-        key = self._get_object_key(name, version, sha)
+        key = self._get_object_key(name, version, sha, triplet)
         logger.debug("Deleting package", key=key)
 
-        if not await self.exists(name, version, sha):
+        if not await self.exists(name, version, sha, triplet):
             return False
 
         try:
@@ -221,9 +223,9 @@ class S3Backend:
             logger.error("Error deleting package", key=key, error=str(e))
             raise StorageError(f"Error deleting package: {e}", cause=e)
 
-    async def stat(self, name: str, version: str, sha: str) -> PackageInfo:
+    async def stat(self, name: str, version: str, sha: str, triplet: str) -> PackageInfo:
         """Get package information."""
-        key = self._get_object_key(name, version, sha)
+        key = self._get_object_key(name, version, sha, triplet)
 
         try:
             loop = asyncio.get_event_loop()
@@ -236,6 +238,7 @@ class S3Backend:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 size=response["ContentLength"],
                 etag=response.get("ETag", "").strip('"'),
                 content_type=response.get("ContentType", "application/octet-stream"),
@@ -244,7 +247,7 @@ class S3Backend:
 
         except Exception as e:
             if "404" in str(e) or "NoSuchKey" in str(e):
-                raise PackageNotFoundError(name, version, sha)
+                raise PackageNotFoundError(name, version, sha, triplet)
             raise StorageError(f"Error getting package info: {e}", cause=e)
 
     async def list_packages(
@@ -274,12 +277,13 @@ class S3Backend:
                         continue
 
                     parts = obj["Key"].split("/")
-                    if len(parts) >= 3:
+                    if len(parts) >= 4:
                         packages.append(
                             PackageInfo(
                                 name=parts[0],
                                 version=parts[1],
                                 sha=parts[2],
+                                triplet=parts[3],
                                 size=obj["Size"],
                                 etag=obj.get("ETag", "").strip('"'),
                                 created_at=obj.get("LastModified"),

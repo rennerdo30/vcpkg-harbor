@@ -63,9 +63,9 @@ class MinioBackend:
             )
         return self._client
 
-    def _get_object_path(self, name: str, version: str, sha: str) -> str:
+    def _get_object_path(self, name: str, version: str, sha: str, triplet: str) -> str:
         """Generate object path from package details."""
-        return f"{name}/{version}/{sha}"
+        return f"{name}/{version}/{sha}/{triplet}"
 
     async def initialize(self) -> None:
         """Initialize the MinIO backend and ensure bucket exists."""
@@ -93,9 +93,9 @@ class MinioBackend:
         logger.debug("Closing MinIO backend")
         self._client = None
 
-    async def exists(self, name: str, version: str, sha: str) -> bool:
+    async def exists(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Check if a package exists."""
-        object_path = self._get_object_path(name, version, sha)
+        object_path = self._get_object_path(name, version, sha, triplet)
 
         try:
             loop = asyncio.get_event_loop()
@@ -108,9 +108,9 @@ class MinioBackend:
                 return False
             raise StorageError(f"Error checking package existence: {e}", cause=e)
 
-    async def get(self, name: str, version: str, sha: str) -> AsyncIterator[bytes]:
+    async def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
         """Get a package as an async iterator of bytes."""
-        object_path = self._get_object_path(name, version, sha)
+        object_path = self._get_object_path(name, version, sha, triplet)
         logger.debug("Getting package", path=object_path)
 
         try:
@@ -134,7 +134,7 @@ class MinioBackend:
         except S3Error as e:
             if e.code == "NoSuchKey":
                 logger.warning("Package not found", path=object_path)
-                raise PackageNotFoundError(name, version, sha)
+                raise PackageNotFoundError(name, version, sha, triplet)
             logger.error("Error getting package", path=object_path, error=str(e))
             raise StorageError(f"Error getting package: {e}", cause=e)
 
@@ -143,17 +143,18 @@ class MinioBackend:
         name: str,
         version: str,
         sha: str,
+        triplet: str,
         data: AsyncIterator[bytes],
         size: int | None = None,
     ) -> PackageInfo:
         """Store a package."""
-        object_path = self._get_object_path(name, version, sha)
+        object_path = self._get_object_path(name, version, sha, triplet)
         logger.debug("Putting package", path=object_path)
 
         # Check if already exists
-        if await self.exists(name, version, sha):
+        if await self.exists(name, version, sha, triplet):
             logger.warning("Package already exists", path=object_path)
-            raise PackageAlreadyExistsError(name, version, sha)
+            raise PackageAlreadyExistsError(name, version, sha, triplet)
 
         try:
             # Collect all data chunks
@@ -181,6 +182,7 @@ class MinioBackend:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 size=actual_size,
                 etag=result.etag if hasattr(result, "etag") else None,
                 created_at=datetime.utcnow(),
@@ -192,12 +194,12 @@ class MinioBackend:
             logger.error("Error uploading package", path=object_path, error=str(e))
             raise StorageError(f"Error uploading package: {e}", cause=e)
 
-    async def delete(self, name: str, version: str, sha: str) -> bool:
+    async def delete(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Delete a package."""
-        object_path = self._get_object_path(name, version, sha)
+        object_path = self._get_object_path(name, version, sha, triplet)
         logger.debug("Deleting package", path=object_path)
 
-        if not await self.exists(name, version, sha):
+        if not await self.exists(name, version, sha, triplet):
             return False
 
         try:
@@ -211,9 +213,9 @@ class MinioBackend:
             logger.error("Error deleting package", path=object_path, error=str(e))
             raise StorageError(f"Error deleting package: {e}", cause=e)
 
-    async def stat(self, name: str, version: str, sha: str) -> PackageInfo:
+    async def stat(self, name: str, version: str, sha: str, triplet: str) -> PackageInfo:
         """Get package information."""
-        object_path = self._get_object_path(name, version, sha)
+        object_path = self._get_object_path(name, version, sha, triplet)
 
         try:
             loop = asyncio.get_event_loop()
@@ -225,6 +227,7 @@ class MinioBackend:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 size=stat.size,
                 etag=stat.etag,
                 content_type=stat.content_type or "application/octet-stream",
@@ -233,7 +236,7 @@ class MinioBackend:
 
         except S3Error as e:
             if e.code == "NoSuchKey":
-                raise PackageNotFoundError(name, version, sha)
+                raise PackageNotFoundError(name, version, sha, triplet)
             raise StorageError(f"Error getting package info: {e}", cause=e)
 
     async def list_packages(
@@ -259,14 +262,15 @@ class MinioBackend:
                 if limit and len(packages) >= limit:
                     break
 
-                # Parse object path (name/version/sha)
+                # Parse object path (name/version/sha/triplet)
                 parts = obj.object_name.split("/")
-                if len(parts) >= 3:
+                if len(parts) >= 4:
                     packages.append(
                         PackageInfo(
                             name=parts[0],
                             version=parts[1],
                             sha=parts[2],
+                            triplet=parts[3],
                             size=obj.size,
                             etag=obj.etag,
                             created_at=obj.last_modified,

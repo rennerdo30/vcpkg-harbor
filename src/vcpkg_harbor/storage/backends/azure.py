@@ -64,9 +64,9 @@ class AzureBackend:
 
         return self._container_client
 
-    def _get_blob_name(self, name: str, version: str, sha: str) -> str:
+    def _get_blob_name(self, name: str, version: str, sha: str, triplet: str) -> str:
         """Generate blob name from package details."""
-        return f"{name}/{version}/{sha}"
+        return f"{name}/{version}/{sha}/{triplet}"
 
     async def initialize(self) -> None:
         """Initialize the Azure backend and ensure container exists."""
@@ -94,9 +94,9 @@ class AzureBackend:
         self._client = None
         self._container_client = None
 
-    async def exists(self, name: str, version: str, sha: str) -> bool:
+    async def exists(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Check if a package exists."""
-        blob_name = self._get_blob_name(name, version, sha)
+        blob_name = self._get_blob_name(name, version, sha, triplet)
 
         try:
             loop = asyncio.get_event_loop()
@@ -105,14 +105,14 @@ class AzureBackend:
         except Exception as e:
             raise StorageError(f"Error checking package existence: {e}", cause=e)
 
-    async def get(self, name: str, version: str, sha: str) -> AsyncIterator[bytes]:
+    async def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
         """Get a package as an async iterator of bytes."""
-        blob_name = self._get_blob_name(name, version, sha)
+        blob_name = self._get_blob_name(name, version, sha, triplet)
         logger.debug("Getting package", blob=blob_name)
 
-        if not await self.exists(name, version, sha):
+        if not await self.exists(name, version, sha, triplet):
             logger.warning("Package not found", blob=blob_name)
-            raise PackageNotFoundError(name, version, sha)
+            raise PackageNotFoundError(name, version, sha, triplet)
 
         try:
             loop = asyncio.get_event_loop()
@@ -134,16 +134,17 @@ class AzureBackend:
         name: str,
         version: str,
         sha: str,
+        triplet: str,
         data: AsyncIterator[bytes],
         size: int | None = None,
     ) -> PackageInfo:
         """Store a package."""
-        blob_name = self._get_blob_name(name, version, sha)
+        blob_name = self._get_blob_name(name, version, sha, triplet)
         logger.debug("Putting package", blob=blob_name)
 
-        if await self.exists(name, version, sha):
+        if await self.exists(name, version, sha, triplet):
             logger.warning("Package already exists", blob=blob_name)
-            raise PackageAlreadyExistsError(name, version, sha)
+            raise PackageAlreadyExistsError(name, version, sha, triplet)
 
         try:
             chunks = []
@@ -167,6 +168,7 @@ class AzureBackend:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 size=actual_size,
                 etag=result.get("etag", "").strip('"'),
                 created_at=datetime.utcnow(),
@@ -178,12 +180,12 @@ class AzureBackend:
             logger.error("Error uploading package", blob=blob_name, error=str(e))
             raise StorageError(f"Error uploading package: {e}", cause=e)
 
-    async def delete(self, name: str, version: str, sha: str) -> bool:
+    async def delete(self, name: str, version: str, sha: str, triplet: str) -> bool:
         """Delete a package."""
-        blob_name = self._get_blob_name(name, version, sha)
+        blob_name = self._get_blob_name(name, version, sha, triplet)
         logger.debug("Deleting package", blob=blob_name)
 
-        if not await self.exists(name, version, sha):
+        if not await self.exists(name, version, sha, triplet):
             return False
 
         try:
@@ -196,12 +198,12 @@ class AzureBackend:
             logger.error("Error deleting package", blob=blob_name, error=str(e))
             raise StorageError(f"Error deleting package: {e}", cause=e)
 
-    async def stat(self, name: str, version: str, sha: str) -> PackageInfo:
+    async def stat(self, name: str, version: str, sha: str, triplet: str) -> PackageInfo:
         """Get package information."""
-        blob_name = self._get_blob_name(name, version, sha)
+        blob_name = self._get_blob_name(name, version, sha, triplet)
 
-        if not await self.exists(name, version, sha):
-            raise PackageNotFoundError(name, version, sha)
+        if not await self.exists(name, version, sha, triplet):
+            raise PackageNotFoundError(name, version, sha, triplet)
 
         try:
             loop = asyncio.get_event_loop()
@@ -212,6 +214,7 @@ class AzureBackend:
                 name=name,
                 version=version,
                 sha=sha,
+                triplet=triplet,
                 size=properties.size,
                 etag=properties.etag.strip('"') if properties.etag else None,
                 content_type=properties.content_settings.content_type
@@ -246,12 +249,13 @@ class AzureBackend:
                     continue
 
                 parts = blob.name.split("/")
-                if len(parts) >= 3:
+                if len(parts) >= 4:
                     packages.append(
                         PackageInfo(
                             name=parts[0],
                             version=parts[1],
                             sha=parts[2],
+                            triplet=parts[3],
                             size=blob.size,
                             etag=blob.etag.strip('"') if blob.etag else None,
                             created_at=blob.creation_time,
