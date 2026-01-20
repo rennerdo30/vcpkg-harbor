@@ -1,7 +1,8 @@
 """Cache API endpoints for vcpkg binary protocol."""
 
 import time
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request, Response

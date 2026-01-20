@@ -1,6 +1,7 @@
 """Authentication middleware for vcpkg-harbor."""
 
-from typing import Awaitable, Callable, TYPE_CHECKING
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware

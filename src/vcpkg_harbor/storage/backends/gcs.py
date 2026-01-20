@@ -1,8 +1,9 @@
 """Google Cloud Storage backend implementation."""
 
 import asyncio
+from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import Any, AsyncIterator, cast
+from typing import Any, cast
 
 import structlog
 

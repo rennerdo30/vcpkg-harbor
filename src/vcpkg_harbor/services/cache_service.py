@@ -1,6 +1,7 @@
 """Cache service for handling package operations."""
 
-from typing import TYPE_CHECKING, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
 import structlog
 

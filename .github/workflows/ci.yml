@@ -41,22 +41,16 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
-    services:
-      minio:
-        image: minio/minio:latest
-        ports:
-          - 9000:9000
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v6
+
+      - name: Start MinIO
+        run: |
+          docker run -d -p 9000:9000 --name minio \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio server /data
+
 
       - name: Set up Python
         uses: actions/setup-python@v6

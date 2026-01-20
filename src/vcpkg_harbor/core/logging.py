@@ -4,7 +4,7 @@ import logging
 import logging.handlers
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from structlog.types import Processor

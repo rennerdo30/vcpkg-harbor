@@ -1,11 +1,11 @@
 """Filesystem storage backend implementation."""
 
-import asyncio
 import hashlib
 import os
+from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
 import aiofiles
 import aiofiles.os

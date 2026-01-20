@@ -1,9 +1,10 @@
 """MinIO storage backend implementation."""
 
 import asyncio
+from collections.abc import AsyncIterator
 from datetime import datetime
 from io import BytesIO
-from typing import Any, AsyncIterator
+from typing import Any
 
 import structlog
 from minio import Minio

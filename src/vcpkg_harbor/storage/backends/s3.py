@@ -1,9 +1,10 @@
 """AWS S3 storage backend implementation."""
 
 import asyncio
+from collections.abc import AsyncIterator
 from datetime import datetime
 from io import BytesIO
-from typing import Any, AsyncIterator
+from typing import Any
 
 import structlog
 
@@ -260,7 +261,6 @@ class S3Backend:
         logger.debug("Listing packages", prefix=prefix, limit=limit, offset=offset)
 
         try:
-            loop = asyncio.get_event_loop()
             paginator = self.client.get_paginator("list_objects_v2")
 
             kwargs = {"Bucket": self.bucket}
@@ -304,7 +304,7 @@ class S3Backend:
         try:
             packages = await self.list_packages()
             total_size = sum(p.size for p in packages)
-            package_names = set(p.name for p in packages)
+            package_names = {p.name for p in packages}
 
             return {
                 "total_packages": len(packages),

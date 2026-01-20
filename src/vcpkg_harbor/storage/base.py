@@ -1,9 +1,10 @@
 """Base storage protocol for vcpkg-harbor storage backends."""
 
 from abc import abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, AsyncIterator, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @dataclass
