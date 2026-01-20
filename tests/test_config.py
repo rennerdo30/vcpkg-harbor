@@ -1,6 +1,7 @@
 """Tests for configuration system."""
 
 import os
+from unittest import mock
 
 import pytest
 
@@ -23,6 +24,7 @@ def test_default_server_settings():
     assert settings.write_only is False
 
 
+@mock.patch.dict(os.environ, {}, clear=True)
 def test_default_storage_settings():
     """Test default storage settings."""
     settings = StorageSettings()
