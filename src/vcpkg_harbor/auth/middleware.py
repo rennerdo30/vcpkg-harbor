@@ -1,6 +1,6 @@
 """Authentication middleware for vcpkg-harbor."""
 
-from typing import TYPE_CHECKING
+from typing import Awaitable, Callable, TYPE_CHECKING
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -71,7 +71,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return False
 
     async def dispatch(
-        self, request: "Request", call_next
+        self, request: "Request", call_next: Callable[["Request"], Awaitable["Response"]]
     ) -> "Response":
         """Process the request and check authentication."""
         path = request.url.path

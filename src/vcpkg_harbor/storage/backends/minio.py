@@ -3,7 +3,7 @@
 import asyncio
 from datetime import datetime
 from io import BytesIO
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 import structlog
 from minio import Minio
@@ -228,7 +228,7 @@ class MinioBackend:
                 version=version,
                 sha=sha,
                 triplet=triplet,
-                size=stat.size,
+                size=stat.size or 0,
                 etag=stat.etag,
                 content_type=stat.content_type or "application/octet-stream",
                 created_at=stat.last_modified,
@@ -255,7 +255,7 @@ class MinioBackend:
                 lambda: list(self.client.list_objects(self.bucket, prefix=prefix, recursive=True)),
             )
 
-            packages = []
+            packages: list[PackageInfo] = []
             for i, obj in enumerate(objects):
                 if i < offset:
                     continue
@@ -283,7 +283,7 @@ class MinioBackend:
             logger.error("Error listing packages", error=str(e))
             raise StorageError(f"Error listing packages: {e}", cause=e)
 
-    async def get_stats(self) -> dict:
+    async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""
         try:
             packages = await self.list_packages()

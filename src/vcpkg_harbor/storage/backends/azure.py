@@ -2,7 +2,7 @@
 
 import asyncio
 from datetime import datetime
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 import structlog
 
@@ -43,7 +43,7 @@ class AzureBackend:
         self._container_client = None
 
     @property
-    def container_client(self):
+    def container_client(self) -> Any:
         """Get the Azure container client."""
         if self._container_client is None:
             from azure.storage.blob import BlobServiceClient
@@ -271,7 +271,7 @@ class AzureBackend:
             logger.error("Error listing packages", error=str(e))
             raise StorageError(f"Error listing packages: {e}", cause=e)
 
-    async def get_stats(self) -> dict:
+    async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""
         try:
             packages = await self.list_packages()

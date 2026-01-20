@@ -2,7 +2,7 @@
 
 import asyncio
 from datetime import datetime
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 import structlog
 
@@ -40,7 +40,7 @@ class GCSBackend:
         self._bucket = None
 
     @property
-    def bucket(self):
+    def bucket(self) -> Any:
         """Get the GCS bucket."""
         if self._bucket is None:
             from google.cloud import storage
@@ -269,7 +269,7 @@ class GCSBackend:
             logger.error("Error listing packages", error=str(e))
             raise StorageError(f"Error listing packages: {e}", cause=e)
 
-    async def get_stats(self) -> dict:
+    async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""
         try:
             packages = await self.list_packages()

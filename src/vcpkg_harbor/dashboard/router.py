@@ -1,7 +1,7 @@
 """Dashboard routes for web UI."""
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import structlog
 from fastapi import APIRouter, Request
@@ -23,12 +23,12 @@ templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
 def get_stats_service(request: Request) -> "StatsService":
     """Get stats service from app state."""
-    return request.app.state.stats_service
+    return cast("StatsService", request.app.state.stats_service)
 
 
 def get_package_service(request: Request) -> "PackageService":
     """Get package service from app state."""
-    return request.app.state.package_service
+    return cast("PackageService", request.app.state.package_service)
 
 
 @router.get("/", response_class=HTMLResponse)

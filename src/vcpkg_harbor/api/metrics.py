@@ -8,6 +8,17 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["metrics"])
 
 
+# Define metrics globals for mypy
+CACHE_HITS = None
+CACHE_MISSES = None
+UPLOADS = None
+DOWNLOADS = None
+ERRORS = None
+PACKAGE_COUNT = None
+STORAGE_SIZE = None
+REQUEST_LATENCY = None
+
+
 @router.get("/metrics")
 async def prometheus_metrics(request: Request) -> Response:
     """Prometheus metrics endpoint.

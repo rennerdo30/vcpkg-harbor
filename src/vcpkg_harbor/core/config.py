@@ -1,7 +1,7 @@
 """Configuration management for vcpkg-harbor using Pydantic Settings."""
 
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -198,7 +198,7 @@ class Settings(BaseSettings):
     metrics: MetricsSettings = Field(default_factory=MetricsSettings)
     dashboard: DashboardSettings = Field(default_factory=DashboardSettings)
 
-    def get_storage_config(self) -> dict:
+    def get_storage_config(self) -> dict[str, Any]:
         """Get the configuration for the active storage backend."""
         backend_configs = {
             "minio": self.minio.model_dump(),
