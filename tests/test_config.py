@@ -54,7 +54,7 @@ def test_logging_level_validation():
 
 def test_settings_aggregation():
     """Test that Settings aggregates all sub-settings."""
-    settings = Settings()
+    settings = Settings(_env_file=None)
     assert hasattr(settings, "server")
     assert hasattr(settings, "storage")
     assert hasattr(settings, "minio")
@@ -64,7 +64,7 @@ def test_settings_aggregation():
 
 def test_get_storage_config():
     """Test getting storage config for different backends."""
-    settings = Settings()
+    settings = Settings(_env_file=None)
 
     # MinIO config
     settings.storage.type = "minio"
