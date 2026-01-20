@@ -257,7 +257,7 @@ class FilesystemBackend:
         try:
             packages = await self.list_packages()
             total_size = sum(p.size for p in packages)
-            package_names = set(p.name for p in packages)
+            package_names = {p.name for p in packages}
 
             # Get disk usage
             stat = os.statvfs(self.base_path)

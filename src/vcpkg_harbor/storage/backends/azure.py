@@ -120,7 +120,7 @@ class AzureBackend:
             blob_client = self.container_client.get_blob_client(blob_name)
             downloader = await loop.run_in_executor(None, blob_client.download_blob)
 
-            chunk_size = 64 * 1024
+
             for chunk in downloader.chunks():
                 yield chunk
 
@@ -277,7 +277,7 @@ class AzureBackend:
         try:
             packages = await self.list_packages()
             total_size = sum(p.size for p in packages)
-            package_names = set(p.name for p in packages)
+            package_names = {p.name for p in packages}
 
             return {
                 "total_packages": len(packages),

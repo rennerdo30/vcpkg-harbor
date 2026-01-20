@@ -32,7 +32,7 @@ async def prometheus_metrics(request: Request) -> Response:
         from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
         # Get our custom metrics
-        stats_service = request.app.state.stats_service
+        # stats_service = request.app.state.stats_service
         # storage = request.app.state.storage
 
         # Update gauges with current values
