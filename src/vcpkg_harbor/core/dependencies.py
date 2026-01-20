@@ -1,7 +1,7 @@
 """FastAPI dependency injection utilities."""
 
 from functools import lru_cache
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from fastapi import Depends, Request
 
@@ -24,7 +24,7 @@ SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
 
 def get_storage(request: Request) -> "StorageBackend":
     """Get the storage backend from app state."""
-    return request.app.state.storage
+    return cast("StorageBackend", request.app.state.storage)
 
 
 StorageDep = Annotated["StorageBackend", Depends(get_storage)]
@@ -32,7 +32,7 @@ StorageDep = Annotated["StorageBackend", Depends(get_storage)]
 
 def get_cache_service(request: Request) -> "CacheService":
     """Get the cache service from app state."""
-    return request.app.state.cache_service
+    return cast("CacheService", request.app.state.cache_service)
 
 
 CacheServiceDep = Annotated["CacheService", Depends(get_cache_service)]
@@ -40,13 +40,13 @@ CacheServiceDep = Annotated["CacheService", Depends(get_cache_service)]
 
 def get_stats_service(request: Request) -> "StatsService":
     """Get the stats service from app state."""
-    return request.app.state.stats_service
+    return cast("StatsService", request.app.state.stats_service)
 
 
 StatsServiceDep = Annotated["StatsService", Depends(get_stats_service)]
 
 
 @lru_cache
-def get_logger_dep(name: str = "vcpkg-harbor"):
+def get_logger_dep(name: str = "vcpkg-harbor") -> Any:
     """Get a logger dependency."""
     return get_logger(name)

@@ -2,7 +2,7 @@
 
 import asyncio
 from datetime import datetime
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, cast
 
 import structlog
 
@@ -60,7 +60,7 @@ class AzureBackend:
                     "Azure storage requires either connection_string or account_name/account_key"
                 )
 
-            self._container_client = self._client.get_container_client(self.container)
+            self._container_client = cast(Any, self._client).get_container_client(self.container)
 
         return self._container_client
 

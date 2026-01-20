@@ -93,7 +93,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Set up authentication if enabled
     if settings.auth.enabled:
         if settings.auth.type == "token" and settings.auth.token:
-            provider = TokenAuthProvider(settings.auth.token)
+            provider: AuthProvider = TokenAuthProvider(settings.auth.token)
             logger.info("Token authentication enabled")
         elif settings.auth.type == "basic" and settings.auth.basic_users:
             provider = BasicAuthProvider.from_string(settings.auth.basic_users)

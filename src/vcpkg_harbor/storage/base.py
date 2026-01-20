@@ -64,7 +64,7 @@ class StorageBackend(Protocol):
         ...
 
     @abstractmethod
-    async def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
+    def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
         """Get a package from storage as an async iterator.
 
         Args:

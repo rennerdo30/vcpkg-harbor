@@ -1,7 +1,7 @@
 """Health check endpoints."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from fastapi import APIRouter, Request
@@ -18,11 +18,11 @@ router = APIRouter(tags=["health"])
 
 def get_storage(request: Request) -> "StorageBackend":
     """Get storage backend from request state."""
-    return request.app.state.storage
+    return cast("StorageBackend", request.app.state.storage)
 
 
 @router.get("/health")
-async def health_check(request: Request) -> dict:
+async def health_check(request: Request) -> dict[str, Any]:
     """Basic health check endpoint.
 
     Returns the overall health status of the service.
@@ -44,7 +44,7 @@ async def health_check(request: Request) -> dict:
 
 
 @router.get("/health/ready")
-async def readiness_check(request: Request) -> dict:
+async def readiness_check(request: Request) -> dict[str, Any]:
     """Readiness check endpoint.
 
     Indicates whether the service is ready to handle requests.
@@ -81,7 +81,7 @@ async def readiness_check(request: Request) -> dict:
 
 
 @router.get("/health/live")
-async def liveness_check() -> dict:
+async def liveness_check() -> dict[str, Any]:
     """Liveness check endpoint.
 
     Indicates whether the service is alive and running.
@@ -97,7 +97,7 @@ async def liveness_check() -> dict:
 
 
 @router.get("/health/details")
-async def health_details(request: Request) -> dict:
+async def health_details(request: Request) -> dict[str, Any]:
     """Detailed health check endpoint.
 
     Returns comprehensive health information including

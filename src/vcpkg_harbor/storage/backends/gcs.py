@@ -2,7 +2,7 @@
 
 import asyncio
 from datetime import datetime
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, cast
 
 import structlog
 
@@ -54,7 +54,7 @@ class GCSBackend:
             else:
                 self._client = storage.Client(project=self.project)
 
-            self._bucket = self._client.bucket(self.bucket_name)
+            self._bucket = cast(Any, self._client).bucket(self.bucket_name)
 
         return self._bucket
 
@@ -73,7 +73,7 @@ class GCSBackend:
             if not exists:
                 await loop.run_in_executor(
                     None,
-                    lambda: self._client.create_bucket(self.bucket, location="US"),
+                    lambda: cast(Any, self._client).create_bucket(self.bucket, location="US"),
                 )
                 logger.info("Created bucket", bucket=self.bucket_name)
             else:
@@ -238,7 +238,7 @@ class GCSBackend:
             loop = asyncio.get_event_loop()
             blobs = await loop.run_in_executor(
                 None,
-                lambda: list(self._client.list_blobs(self.bucket_name, prefix=prefix)),
+                lambda: list(cast(Any, self._client).list_blobs(self.bucket_name, prefix=prefix)),
             )
 
             packages = []
