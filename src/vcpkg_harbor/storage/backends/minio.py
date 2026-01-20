@@ -75,9 +75,7 @@ class MinioBackend:
         try:
             # Run synchronous MinIO operations in thread pool
             loop = asyncio.get_event_loop()
-            bucket_exists = await loop.run_in_executor(
-                None, self.client.bucket_exists, self.bucket
-            )
+            bucket_exists = await loop.run_in_executor(None, self.client.bucket_exists, self.bucket)
 
             if not bucket_exists:
                 await loop.run_in_executor(None, self.client.make_bucket, self.bucket)
@@ -100,9 +98,7 @@ class MinioBackend:
 
         try:
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                None, self.client.stat_object, self.bucket, object_path
-            )
+            await loop.run_in_executor(None, self.client.stat_object, self.bucket, object_path)
             return True
         except S3Error as e:
             if e.code == "NoSuchKey":
@@ -205,9 +201,7 @@ class MinioBackend:
 
         try:
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                None, self.client.remove_object, self.bucket, object_path
-            )
+            await loop.run_in_executor(None, self.client.remove_object, self.bucket, object_path)
             logger.info("Package deleted", path=object_path)
             return True
         except Exception as e:

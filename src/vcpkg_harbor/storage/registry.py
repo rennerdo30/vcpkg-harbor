@@ -83,6 +83,8 @@ def get_storage_backend(settings: "Settings") -> "StorageBackend":
         )
 
     backend_class = _backends[backend_type]
-    logger.info("Creating storage backend", type=backend_type, config_keys=list(backend_config.keys()))
+    logger.info(
+        "Creating storage backend", type=backend_type, config_keys=list(backend_config.keys())
+    )
 
     return backend_class(**backend_config)

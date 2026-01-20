@@ -103,7 +103,12 @@ async def package_detail(request: Request, name: str) -> HTMLResponse:
     if not versions:
         return templates.TemplateResponse(
             "404.html",
-            {"request": request, "message": f"Package '{name}' not found", "cache_stats": cache_stats, "uptime": uptime},
+            {
+                "request": request,
+                "message": f"Package '{name}' not found",
+                "cache_stats": cache_stats,
+                "uptime": uptime,
+            },
             status_code=404,
         )
 

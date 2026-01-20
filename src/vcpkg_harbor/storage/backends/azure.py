@@ -120,7 +120,6 @@ class AzureBackend:
             blob_client = self.container_client.get_blob_client(blob_name)
             downloader = await loop.run_in_executor(None, blob_client.download_blob)
 
-
             for chunk in downloader.chunks():
                 yield chunk
 
@@ -158,9 +157,7 @@ class AzureBackend:
             blob_client = self.container_client.get_blob_client(blob_name)
             result = await loop.run_in_executor(
                 None,
-                lambda: blob_client.upload_blob(
-                    body, content_type="application/octet-stream"
-                ),
+                lambda: blob_client.upload_blob(body, content_type="application/octet-stream"),
             )
 
             logger.info("Package uploaded", blob=blob_name, size=actual_size)
@@ -218,8 +215,7 @@ class AzureBackend:
                 triplet=triplet,
                 size=properties.size,
                 etag=properties.etag.strip('"') if properties.etag else None,
-                content_type=properties.content_settings.content_type
-                or "application/octet-stream",
+                content_type=properties.content_settings.content_type or "application/octet-stream",
                 created_at=properties.creation_time,
             )
 

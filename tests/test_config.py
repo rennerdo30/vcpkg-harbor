@@ -16,7 +16,7 @@ from vcpkg_harbor.core.config import (
 
 def test_default_server_settings():
     """Test default server settings."""
-    settings = ServerSettings()
+    settings = ServerSettings(_env_file=None)
     assert settings.host == "0.0.0.0"
     assert settings.port == 15151
     assert settings.workers == 4
@@ -27,14 +27,14 @@ def test_default_server_settings():
 @mock.patch.dict(os.environ, {}, clear=True)
 def test_default_storage_settings():
     """Test default storage settings."""
-    settings = StorageSettings()
+    settings = StorageSettings(_env_file=None)
     assert settings.type == "filesystem"
     assert settings.path == "./cache"
 
 
 def test_default_minio_settings():
     """Test default MinIO settings."""
-    settings = MinioSettings()
+    settings = MinioSettings(_env_file=None)
     assert settings.endpoint == "localhost:9000"
     assert settings.bucket == "vcpkg-harbor"
     assert settings.secure is False
@@ -42,14 +42,14 @@ def test_default_minio_settings():
 
 def test_logging_level_validation():
     """Test logging level validation."""
-    settings = LoggingSettings(level="DEBUG")
+    settings = LoggingSettings(level="DEBUG", _env_file=None)
     assert settings.level == "DEBUG"
 
-    settings = LoggingSettings(level="info")
+    settings = LoggingSettings(level="info", _env_file=None)
     assert settings.level == "INFO"
 
     with pytest.raises(ValueError):
-        LoggingSettings(level="INVALID")
+        LoggingSettings(level="INVALID", _env_file=None)
 
 
 def test_settings_aggregation():

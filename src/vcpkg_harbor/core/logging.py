@@ -84,9 +84,7 @@ def _setup_file_logging(settings: "Settings") -> None:
             logging.Formatter('{"timestamp":"%(asctime)s","message":"%(message)s"}')
         )
     else:
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        )
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 
     logging.getLogger().addHandler(file_handler)
 

@@ -78,9 +78,7 @@ class S3Backend:
 
             # Check if bucket exists
             try:
-                await loop.run_in_executor(
-                    None, self.client.head_bucket, {"Bucket": self.bucket}
-                )
+                await loop.run_in_executor(None, self.client.head_bucket, {"Bucket": self.bucket})
                 logger.debug("Bucket exists", bucket=self.bucket)
             except Exception:
                 # Create bucket

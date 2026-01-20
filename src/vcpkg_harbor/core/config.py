@@ -102,9 +102,7 @@ class GCSSettings(BaseSettings):
 
     bucket: str = Field(default="vcpkg-harbor", description="GCS bucket name")
     project: str | None = Field(default=None, description="GCP project ID")
-    credentials_file: str | None = Field(
-        default=None, description="Path to service account JSON"
-    )
+    credentials_file: str | None = Field(default=None, description="Path to service account JSON")
 
 
 class LoggingSettings(BaseSettings):

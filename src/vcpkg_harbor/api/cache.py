@@ -73,7 +73,14 @@ async def check_package(
         raise
     except Exception as e:
         stats_service.record_error()
-        logger.error("Error checking package", name=name, version=version, sha=sha, triplet=triplet, error=str(e))
+        logger.error(
+            "Error checking package",
+            name=name,
+            version=version,
+            sha=sha,
+            triplet=triplet,
+            error=str(e),
+        )
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         elapsed = (time.time() - start_time) * 1000
@@ -144,7 +151,14 @@ async def download_package(
         raise HTTPException(status_code=404, detail="Package not found")
     except Exception as e:
         stats_service.record_error()
-        logger.error("Error downloading package", name=name, version=version, sha=sha, triplet=triplet, error=str(e))
+        logger.error(
+            "Error downloading package",
+            name=name,
+            version=version,
+            sha=sha,
+            triplet=triplet,
+            error=str(e),
+        )
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         elapsed = (time.time() - start_time) * 1000
@@ -216,7 +230,14 @@ async def upload_package(
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         stats_service.record_error()
-        logger.error("Error uploading package", name=name, version=version, sha=sha, triplet=triplet, error=str(e))
+        logger.error(
+            "Error uploading package",
+            name=name,
+            version=version,
+            sha=sha,
+            triplet=triplet,
+            error=str(e),
+        )
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
     finally:
         elapsed = (time.time() - start_time) * 1000
@@ -252,7 +273,13 @@ async def delete_package(
         deleted = await cache_service.delete_package(name, version, sha, triplet)
 
         if deleted:
-            return {"status": "deleted", "name": name, "version": version, "sha": sha, "triplet": triplet}
+            return {
+                "status": "deleted",
+                "name": name,
+                "version": version,
+                "sha": sha,
+                "triplet": triplet,
+            }
         else:
             raise HTTPException(status_code=404, detail="Package not found")
 
@@ -265,7 +292,14 @@ async def delete_package(
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         stats_service.record_error()
-        logger.error("Error deleting package", name=name, version=version, sha=sha, triplet=triplet, error=str(e))
+        logger.error(
+            "Error deleting package",
+            name=name,
+            version=version,
+            sha=sha,
+            triplet=triplet,
+            error=str(e),
+        )
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         elapsed = (time.time() - start_time) * 1000
