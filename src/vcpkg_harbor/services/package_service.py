@@ -108,7 +108,7 @@ class PackageService:
 
         for name in sorted_names[offset : offset + limit]:
             packages = package_groups[name]
-            versions = list(set(p.version for p in packages))
+            versions = list({p.version for p in packages})
 
             # Sort versions (try semver-like sorting)
             versions.sort(reverse=True)

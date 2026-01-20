@@ -26,7 +26,7 @@ def test_default_server_settings():
 def test_default_storage_settings():
     """Test default storage settings."""
     settings = StorageSettings()
-    assert settings.type == "minio"
+    assert settings.type == "filesystem"
     assert settings.path == "./cache"
 
 

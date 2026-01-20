@@ -33,11 +33,11 @@ async def prometheus_metrics(request: Request) -> Response:
 
         # Get our custom metrics
         stats_service = request.app.state.stats_service
-        storage = request.app.state.storage
+        # storage = request.app.state.storage
 
         # Update gauges with current values
-        cache_stats = await stats_service.get_cache_stats()
-        request_stats = stats_service.get_request_stats()
+        # cache_stats = await stats_service.get_cache_stats()
+        # request_stats = stats_service.get_request_stats()
 
         # Generate Prometheus output
         metrics_output = generate_latest()
