@@ -1,7 +1,7 @@
 """Cache API endpoints for vcpkg binary protocol."""
 
 import time
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -159,7 +159,7 @@ async def upload_package(
     request: Request,
     cache_service: CacheServiceDep,
     stats_service: StatsServiceDep,
-) -> dict:
+) -> dict[str, Any]:
     """Upload a package to the cache.
 
     This endpoint receives a binary package and stores it in the cache.
@@ -230,7 +230,7 @@ async def delete_package(
     triplet: str,
     cache_service: CacheServiceDep,
     stats_service: StatsServiceDep,
-) -> dict:
+) -> dict[str, Any]:
     """Delete a package from the cache.
 
     This endpoint removes a package from the cache.

@@ -49,7 +49,7 @@ class GCSBackend:
             if self.credentials_file:
                 credentials = service_account.Credentials.from_service_account_file(
                     self.credentials_file
-                )
+                )  # type: ignore
                 self._client = storage.Client(credentials=credentials, project=self.project)
             else:
                 self._client = storage.Client(project=self.project)

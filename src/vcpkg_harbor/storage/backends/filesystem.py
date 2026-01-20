@@ -5,7 +5,7 @@ import hashlib
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 import aiofiles
 import aiofiles.os
@@ -252,7 +252,7 @@ class FilesystemBackend:
             logger.error("Error listing packages", error=str(e))
             raise StorageError(f"Error listing packages: {e}", cause=e)
 
-    async def get_stats(self) -> dict:
+    async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""
         try:
             packages = await self.list_packages()

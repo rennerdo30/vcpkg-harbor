@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from vcpkg_harbor import __version__
 from vcpkg_harbor.api import cache_router, health_router, metrics_router
-from vcpkg_harbor.auth import AuthMiddleware, BasicAuthProvider, NoAuthProvider, TokenAuthProvider
+from vcpkg_harbor.auth import AuthMiddleware, AuthProvider, BasicAuthProvider, NoAuthProvider, TokenAuthProvider
 from vcpkg_harbor.core.config import Settings, get_settings
 from vcpkg_harbor.core.logging import setup_logging
 from vcpkg_harbor.dashboard import router as dashboard_router

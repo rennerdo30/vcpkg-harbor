@@ -39,7 +39,7 @@ class AzureBackend:
         self.account_name = account_name
         self.account_key = account_key
         self.container = container
-        self._client = None
+        self._client: Any = None
         self._container_client = None
 
     @property

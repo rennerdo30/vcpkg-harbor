@@ -4,7 +4,7 @@ import logging
 import logging.handlers
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from structlog.types import Processor
@@ -67,6 +67,8 @@ def setup_logging(settings: "Settings") -> None:
 
 def _setup_file_logging(settings: "Settings") -> None:
     """Set up rotating file logging."""
+    if not settings.logging.file:
+        return
     log_path = Path(settings.logging.file)
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -89,6 +91,6 @@ def _setup_file_logging(settings: "Settings") -> None:
     logging.getLogger().addHandler(file_handler)
 
 
-def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str | None = None) -> Any:
     """Get a structured logger instance."""
     return structlog.get_logger(name)

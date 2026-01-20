@@ -30,7 +30,7 @@ class CacheStats:
     @property
     def total_size_human(self) -> str:
         """Get human-readable total size."""
-        size = self.total_size_bytes
+        size: float = float(self.total_size_bytes)
         for unit in ["B", "KB", "MB", "GB", "TB"]:
             if size < 1024:
                 return f"{size:.2f} {unit}"

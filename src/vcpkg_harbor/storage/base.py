@@ -3,7 +3,7 @@
 from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import AsyncIterator, Protocol, runtime_checkable
+from typing import Any, AsyncIterator, Protocol, runtime_checkable
 
 
 @dataclass
@@ -18,7 +18,7 @@ class PackageInfo:
     etag: str | None = None
     content_type: str = "application/octet-stream"
     created_at: datetime | None = None
-    metadata: dict | None = None
+    metadata: dict[str, Any] | None = None
 
     @property
     def object_path(self) -> str:
@@ -163,7 +163,7 @@ class StorageBackend(Protocol):
         ...
 
     @abstractmethod
-    async def get_stats(self) -> dict:
+    async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics.
 
         Returns:
