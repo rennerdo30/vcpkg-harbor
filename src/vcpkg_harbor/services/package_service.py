@@ -20,6 +20,7 @@ class PackageVersion:
     name: str
     version: str
     sha: str
+    triplet: str
     size: int
     created_at: str | None = None
 
@@ -30,6 +31,7 @@ class PackageVersion:
             name=info.name,
             version=info.version,
             sha=info.sha,
+            triplet=info.triplet,
             size=info.size,
             created_at=info.created_at.isoformat() if info.created_at else None,
         )
