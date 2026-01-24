@@ -9,6 +9,8 @@ export default defineConfig({
     starlight({
       title: "vcpkg-harbor",
       description: "Binary cache server for vcpkg with plugin-based storage backends",
+      logo: { src: "/logo.svg", alt: "vcpkg-harbor" },
+      favicon: "/logo.svg",
       plugins: [starlightThemeGalaxy(), starlightClientMermaid()],
       customCss: ["./src/styles/custom.css"],
       social: [

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- vcpkg-harbor: Anchor/harbor with package -->
+  <circle cx="16" cy="8" r="3" stroke="#22d3ee" stroke-width="2" fill="none"/>
+  <path d="M16 11v12M10 27h12" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+  <path d="M8 21l4 4m12-4l-4 4" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+  <rect x="20" y="4" width="8" height="8" rx="1" fill="#f97316" opacity="0.9"/>
+  <path d="M22 8h4M24 6v4" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
