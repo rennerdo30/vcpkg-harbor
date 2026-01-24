@@ -106,28 +106,18 @@ Services encapsulate business logic:
 
 ### Request Flow
 
-```
-Client Request
-    │
-    ▼
-┌─────────────────┐
-│  Auth Middleware │ (optional)
-└────────┬────────┘
-         │
-    ▼
-┌─────────────────┐
-│  FastAPI Router │
-└────────┬────────┘
-         │
-    ▼
-┌─────────────────┐
-│   Service Layer │
-└────────┬────────┘
-         │
-    ▼
-┌─────────────────┐
-│ Storage Backend │
-└─────────────────┘
+```mermaid
+graph TB
+    A[Client Request] --> B[Auth Middleware]
+    B --> C[FastAPI Router]
+    C --> D[Service Layer]
+    D --> E[Storage Backend]
+
+    style A fill:#4a90e2,stroke:#2c5aa0,color:#fff
+    style B fill:#ffa726,stroke:#f57c00,color:#fff
+    style C fill:#7b68ee,stroke:#5a4fcf,color:#fff
+    style D fill:#50c878,stroke:#3a9d5f,color:#fff
+    style E fill:#26c6da,stroke:#00acc1,color:#fff
 ```
 
 ## Async Architecture
