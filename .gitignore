@@ -149,3 +149,5 @@ cache/
 
 # Docker
 docker-compose.override.yml
+docs/node_modules
+docs/dist
