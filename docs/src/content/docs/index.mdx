@@ -53,16 +53,18 @@ vcpkg install zlib boost
 
 ## Architecture
 
-```
-┌─────────────────┐     ┌─────────────────┐
-│  vcpkg client   │────▶│  vcpkg-harbor   │
-└─────────────────┘     └────────┬────────┘
-                                 │
-                    ┌────────────┼────────────┐
-                    ▼            ▼            ▼
-              ┌─────────┐ ┌─────────┐ ┌─────────┐
-              │  MinIO  │ │   S3    │ │  Azure  │
-              └─────────┘ └─────────┘ └─────────┘
+```mermaid
+graph TD
+    Client[vcpkg client] --> Harbor[vcpkg-harbor]
+    Harbor --> MinIO[(MinIO)]
+    Harbor --> S3[(S3)]
+    Harbor --> Azure[(Azure)]
+
+    style Client fill:#22d3ee,stroke:#0891b2,color:#000
+    style Harbor fill:#f97316,stroke:#ea580c,color:#fff
+    style MinIO fill:#94a3b8,stroke:#64748b,color:#000
+    style S3 fill:#94a3b8,stroke:#64748b,color:#000
+    style Azure fill:#94a3b8,stroke:#64748b,color:#000
 ```
 
 ## Documentation
