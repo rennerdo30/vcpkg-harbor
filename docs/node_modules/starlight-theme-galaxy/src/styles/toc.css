@@ -1,0 +1,87 @@
+/* ============================
+ * Table of Contents Styling
+ * ============================ */
+.right-sidebar {
+    border-inline-start: initial;
+
+    @media (min-width: 72rem) {
+        padding-top: calc(var(--sl-nav-height) + 1.75rem);
+    }
+
+    starlight-toc li {
+        &>a {
+            border-inline-start: 1px solid var(--sl-color-hairline-light);
+            border-radius: 0;
+            margin-inline-start: 0.35rem;
+            padding-inline-start: calc(1rem * var(--depth) + var(--pad-inline) + 0.35rem);
+            position: relative;
+            transition: all 0.3s ease;
+            font-size: 0.8125rem;
+
+            &::before {
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 0;
+                height: 0;
+                border-top: 0 solid transparent;
+                border-bottom: 0 solid transparent;
+                border-left: 0 solid var(--sl-color-accent-high);
+                transition: border-width 0.3s ease-in-out;
+            }
+
+            &[aria-current='true'] {
+                border-color: var(--sl-color-accent-high);
+                color: var(--sl-color-accent-high);
+                font-weight: 700;
+                width: fit-content;
+                display: block;
+                position: relative;
+
+                &::before {
+                    border-top-width: 12px;
+                    border-bottom-width: 12px;
+                    border-left-width: 9px;
+                }
+
+                &::after {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: linear-gradient(90deg, color-mix(in srgb, var(--sl-color-accent) 15%, transparent) 0%, transparent 100%);
+                    box-shadow: 0 0 8px color-mix(in srgb, var(--sl-color-accent) 30%, transparent);
+                    border-radius: 0.45rem;
+                    z-index: -1;
+                }
+
+                &:is(:hover, :focus-visible) {
+                    color: var(--sl-color-accent-high);
+                }
+            }
+
+            &:not([aria-current='true']):is(:hover, :focus-visible) {
+                border-color: transparent;
+                font-weight: 600;
+                transition: none;
+                position: relative;
+                color: var(--sl-color-accent-high);
+                &::after {
+                    content: '';
+                    position: absolute;
+                    left: -1px;
+                    top: 0;
+                    bottom: 0;
+                    width: 3px;
+                    height: 100%;
+                    background-color: var(--sl-color-accent-high);
+                    border-radius: 0 0.5rem 0.5rem 0;
+                }
+            }
+        }
+    }
+}

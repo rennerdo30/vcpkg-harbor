@@ -1,0 +1,70 @@
+---
+title: "Installation"
+description: "Documentation for Installation"
+---
+
+# Installation
+
+## Requirements
+
+- Python 3.11 or higher
+- One of the supported storage backends (MinIO, S3, Azure Blob, GCS, or filesystem)
+
+## Installation Methods
+
+### Using pip (Recommended)
+
+```bash
+pip install vcpkg-harbor
+```
+
+### From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/rennerdo30/vcpkg-harbor.git
+cd vcpkg-harbor
+
+# Install in development mode
+pip install -e ".[dev]"
+```
+
+### Using Docker
+
+```bash
+# Pull from GitHub Container Registry
+docker pull ghcr.io/rennerdo30/vcpkg-harbor:latest
+
+# Or build locally
+docker build -t vcpkg-harbor .
+```
+
+## Verify Installation
+
+```bash
+# Check version
+vcpkg-harbor --help
+
+# Or with Python module
+python -m vcpkg_harbor --help
+```
+
+## Optional Dependencies
+
+vcpkg-harbor installs all storage backend dependencies by default. If you only need specific backends, you can install a minimal version and add backends as needed:
+
+```bash
+# Install with all backends (default)
+pip install vcpkg-harbor
+
+# The package includes:
+# - minio (MinIO/S3-compatible)
+# - boto3 (AWS S3)
+# - azure-storage-blob (Azure Blob Storage)
+# - google-cloud-storage (Google Cloud Storage)
+```
+
+## Next Steps
+
+- [Quick Start](quickstart.md) - Get up and running in minutes
+- [Configuration](configuration.md) - Configure storage and other options

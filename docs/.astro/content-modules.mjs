@@ -1,0 +1,17 @@
+
+export default new Map([
+["src/content/docs/api-reference.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fapi-reference.mdx&astroContentModuleFlag=true")],
+["src/content/docs/deployment/docker.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fdeployment%2Fdocker.mdx&astroContentModuleFlag=true")],
+["src/content/docs/index.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Findex.mdx&astroContentModuleFlag=true")],
+["src/content/docs/deployment/kubernetes.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fdeployment%2Fkubernetes.mdx&astroContentModuleFlag=true")],
+["src/content/docs/development/contributing.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fdevelopment%2Fcontributing.mdx&astroContentModuleFlag=true")],
+["src/content/docs/development/testing.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fdevelopment%2Ftesting.mdx&astroContentModuleFlag=true")],
+["src/content/docs/getting-started/configuration.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fgetting-started%2Fconfiguration.mdx&astroContentModuleFlag=true")],
+["src/content/docs/development/architecture.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fdevelopment%2Farchitecture.mdx&astroContentModuleFlag=true")],
+["src/content/docs/getting-started/quickstart.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fgetting-started%2Fquickstart.mdx&astroContentModuleFlag=true")],
+["src/content/docs/getting-started/installation.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fgetting-started%2Finstallation.mdx&astroContentModuleFlag=true")],
+["src/content/docs/user-guide/dashboard.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fuser-guide%2Fdashboard.mdx&astroContentModuleFlag=true")],
+["src/content/docs/user-guide/authentication.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fuser-guide%2Fauthentication.mdx&astroContentModuleFlag=true")],
+["src/content/docs/user-guide/storage-backends.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fuser-guide%2Fstorage-backends.mdx&astroContentModuleFlag=true")],
+["src/content/docs/user-guide/metrics.mdx", () => import("astro:content-layer-deferred-module?astro%3Acontent-layer-deferred-module=&fileName=src%2Fcontent%2Fdocs%2Fuser-guide%2Fmetrics.mdx&astroContentModuleFlag=true")]]);
+		
