@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" alt="vcpkg-harbor logo" width="200">
+  <img src="docs/public/logo.svg" alt="vcpkg-harbor logo" width="160">
 </p>
 
 <h1 align="center">vcpkg-harbor</h1>
 
 <p align="center">
-  <strong>A high-performance binary cache server for <a href="https://github.com/microsoft/vcpkg">vcpkg</a></strong>
+  <strong>A binary cache server for <a href="https://github.com/microsoft/vcpkg">vcpkg</a>, with pluggable storage and a web dashboard</strong>
 </p>
 
 <p align="center">
@@ -13,153 +13,213 @@
   <a href="https://github.com/rennerdo30/vcpkg-harbor/actions/workflows/docker-image.yml"><img src="https://github.com/rennerdo30/vcpkg-harbor/actions/workflows/docker-image.yml/badge.svg" alt="Docker"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python 3.11+"></a>
-  <a href="https://pypi.org/project/vcpkg-harbor/"><img src="https://img.shields.io/pypi/v/vcpkg-harbor.svg" alt="PyPI version"></a>
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#documentation">Documentation</a> •
-  <a href="#contributing">Contributing</a>
+  <a href="#why">Why</a> •
+  <a href="#quick-start">Quick start</a> •
+  <a href="#configuration">Configuration</a> •
+  <a href="#dashboard">Dashboard</a> •
+  <a href="#documentation">Documentation</a>
 </p>
 
 ---
 
-vcpkg-harbor caches compiled C++ packages, allowing teams to share pre-built binaries and dramatically reduce build times. It supports multiple storage backends and provides a web dashboard for monitoring.
+## Why
+
+Building C++ dependencies from source is slow, and every machine and CI job repeats
+the same work. vcpkg can push and pull the results of those builds over HTTP, so a
+binary once built is reused everywhere.
+
+vcpkg-harbor is that HTTP endpoint: it implements the vcpkg binary caching protocol
+(`HEAD`/`GET`/`PUT` on `/{name}/{version}/{sha}/{triplet}`), stores the archives in
+the backend of your choice, and shows you what is in the cache.
 
 ## Features
 
-- 🚀 **Multiple Storage Backends** - MinIO, AWS S3, Azure Blob, Google Cloud Storage, or local filesystem
-- 🔌 **Plugin Architecture** - Easy to add custom storage backends via entry points
-- 📊 **Web Dashboard** - Monitor cache statistics and browse packages in real-time
-- 📈 **Prometheus Metrics** - Built-in metrics endpoint for monitoring and alerting
-- 🔐 **Authentication** - Token and HTTP Basic authentication support
-- ⚡ **High Performance** - Async Python with streaming uploads/downloads
-- 🐳 **Docker Ready** - Production-ready Docker images and compose files
+- 🚀 **Multiple storage backends** - MinIO, AWS S3, Azure Blob, Google Cloud Storage, or the local filesystem
+- 🔌 **Plugin architecture** - add your own backend through the `vcpkg_harbor.storage` entry point
+- 📊 **Web dashboard** - browse cached packages and watch cache statistics live
+- 📈 **Prometheus metrics** - `/metrics` endpoint for monitoring and alerting
+- 🔐 **Optional authentication** - static token or HTTP Basic
+- ⚡ **Async and streaming** - FastAPI with streaming uploads and downloads
+- 🐳 **Container images** - published to GitHub Container Registry, plus Compose files
 
-## Quick Start
+## Quick start
 
-### Option 1: Using pip (Simplest)
+### Docker
 
 ```bash
-# Install vcpkg-harbor
-pip install vcpkg-harbor
+# Filesystem storage, cache kept in a named volume
+docker run -d -p 15151:15151 -v vcpkg-cache:/app/cache \
+  ghcr.io/rennerdo30/vcpkg-harbor:main
+```
 
-# Start with filesystem storage (default)
+Images are published to `ghcr.io/rennerdo30/vcpkg-harbor` and tagged per branch
+(`main`) and commit (`sha-…`).
+
+### Docker Compose
+
+```bash
+git clone https://github.com/rennerdo30/vcpkg-harbor.git
+cd vcpkg-harbor
+
+docker compose -f docker-compose.simple.yml up -d   # filesystem storage
+docker compose up -d                                # includes MinIO
+```
+
+### From source
+
+```bash
+git clone https://github.com/rennerdo30/vcpkg-harbor.git
+cd vcpkg-harbor
+./run.sh          # creates .venv, installs the package, starts the server
+```
+
+Or install it into an environment of your own — the project is not on PyPI yet, so
+install it from Git:
+
+```bash
+pip install git+https://github.com/rennerdo30/vcpkg-harbor.git
 vcpkg-harbor
 ```
 
-### Option 2: Using Docker
+The server listens on <http://localhost:15151> and uses filesystem storage in
+`./cache` unless configured otherwise.
+
+### Point vcpkg at it
 
 ```bash
-# Simple deployment (filesystem storage)
-docker run -d -p 15151:15151 -v vcpkg-cache:/app/cache \
-  ghcr.io/rennerdo30/vcpkg-harbor:latest
-
-# Or with Docker Compose (includes MinIO)
-git clone https://github.com/rennerdo30/vcpkg-harbor.git
-cd vcpkg-harbor
-docker-compose up -d
-```
-
-### Option 3: From Source
-
-```bash
-git clone https://github.com/rennerdo30/vcpkg-harbor.git
-cd vcpkg-harbor
-./run.sh
-```
-
-### Configure vcpkg
-
-```bash
-# Set environment variable
 export VCPKG_BINARY_SOURCES="clear;http,http://localhost:15151/{name}/{version}/{sha}/{triplet},readwrite"
 
-# Install packages (binaries will be cached)
 vcpkg install zlib boost
 ```
 
-## Storage Backends
+Use `readwrite` on machines that should upload, and `read` on machines that should
+only consume the cache. The dashboard home page shows the exact line for the host
+you are visiting.
 
-| Backend | Use Case | Configuration |
+## Storage backends
+
+| Backend | Use case | Configuration |
 |---------|----------|---------------|
-| **Filesystem** (default) | Development, small teams | `VCPKG_STORAGE_TYPE=filesystem` |
-| **MinIO** | On-premises, S3-compatible | `VCPKG_STORAGE_TYPE=minio` |
+| **Filesystem** (default) | Development, single machine | `VCPKG_STORAGE_TYPE=filesystem` |
+| **MinIO** | Self-hosted, S3 compatible | `VCPKG_STORAGE_TYPE=minio` |
 | **AWS S3** | AWS deployments | `VCPKG_STORAGE_TYPE=s3` |
 | **Azure Blob** | Azure deployments | `VCPKG_STORAGE_TYPE=azure` |
 | **Google Cloud Storage** | GCP deployments | `VCPKG_STORAGE_TYPE=gcs` |
 
 ## Configuration
 
-vcpkg-harbor is configured via environment variables:
+Everything is configured through environment variables (or a `.env` file — see
+[`.env.example`](.env.example) for the full list).
 
 ```bash
 # Server
 VCPKG_SERVER_HOST=0.0.0.0
 VCPKG_SERVER_PORT=15151
+VCPKG_SERVER_WORKERS=4
+VCPKG_SERVER_READ_ONLY=false
 
-# Storage (filesystem is default)
+# Storage (filesystem is the default)
 VCPKG_STORAGE_TYPE=filesystem
 VCPKG_STORAGE_PATH=./cache
 
-# Logging
-VCPKG_LOG_LEVEL=INFO
+# MinIO, when VCPKG_STORAGE_TYPE=minio
+VCPKG_MINIO_ENDPOINT=localhost:9000
+VCPKG_MINIO_ACCESS_KEY=…
+VCPKG_MINIO_SECRET_KEY=…
+VCPKG_MINIO_BUCKET=vcpkg-harbor
 
-# Authentication (optional)
+# Logging (console + rotating file)
+VCPKG_LOG_LEVEL=INFO
+VCPKG_LOG_JSON=false
+VCPKG_LOG_FILE=logs/vcpkg-harbor.log
+
+# Authentication (disabled by default)
 VCPKG_AUTH_ENABLED=true
 VCPKG_AUTH_TYPE=token
 VCPKG_AUTH_TOKEN=your-secret-token
+
+# Dashboard and metrics
+VCPKG_DASHBOARD_ENABLED=true
+VCPKG_METRICS_ENABLED=true
 ```
 
-## API Endpoints
+## API endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/{name}/{version}/{sha}/{triplet}` | HEAD | Check if package exists |
-| `/{name}/{version}/{sha}/{triplet}` | GET | Download package |
-| `/{name}/{version}/{sha}/{triplet}` | PUT | Upload package |
-| `/health` | GET | Health check |
+| `/{name}/{version}/{sha}/{triplet}` | HEAD | Check whether a binary is cached |
+| `/{name}/{version}/{sha}/{triplet}` | GET | Download a cached binary |
+| `/{name}/{version}/{sha}/{triplet}` | PUT | Upload a binary |
+| `/health` | GET | Liveness check |
+| `/health/details` | GET | Health check including the storage backend |
 | `/metrics` | GET | Prometheus metrics |
-| `/` | GET | Web dashboard |
+| `/api/docs` | GET | OpenAPI reference (Swagger UI) |
+| `/`, `/packages`, `/stats` | GET | Web dashboard |
+
+## Dashboard
+
+The dashboard is served from the same process as the cache API:
+
+- **Dashboard** - cache size, request volume, hit rate, recent uploads and the
+  `VCPKG_BINARY_SOURCES` line for this server
+- **Packages** - search the cache and drill into the cached builds of a package
+- **Statistics** - cache and request counters, plus the largest cached builds
+
+It is server-rendered with Jinja2 and Tailwind CSS, and refreshes its figures in
+place with HTMX — no build step and no JavaScript bundle.
+
+## Tech stack
+
+- **FastAPI** and **uvicorn** for the HTTP layer
+- **Pydantic Settings** for configuration
+- **structlog** for structured console and file logging
+- **Jinja2 + Tailwind CSS + HTMX** for the dashboard
+- **prometheus-client** for metrics
+- Backend SDKs: **minio**, **boto3**, **azure-storage-blob**, **google-cloud-storage**
+- **Astro Starlight** for the documentation site
 
 ## Documentation
 
-📚 **[Full Documentation](https://rennerdo30.github.io/vcpkg-harbor/)**
+📚 **[Full documentation](https://vcpkg-harbor.docs.renner.dev/)**
 
-- [Installation](https://rennerdo30.github.io/vcpkg-harbor/getting-started/installation/)
-- [Quick Start](https://rennerdo30.github.io/vcpkg-harbor/getting-started/quickstart/)
-- [Configuration](https://rennerdo30.github.io/vcpkg-harbor/getting-started/configuration/)
-- [Storage Backends](https://rennerdo30.github.io/vcpkg-harbor/user-guide/storage-backends/)
-- [Docker Deployment](https://rennerdo30.github.io/vcpkg-harbor/deployment/docker/)
-- [Kubernetes Deployment](https://rennerdo30.github.io/vcpkg-harbor/deployment/kubernetes/)
+- [Installation](https://vcpkg-harbor.docs.renner.dev/getting-started/installation/)
+- [Quick start](https://vcpkg-harbor.docs.renner.dev/getting-started/quickstart/)
+- [Configuration](https://vcpkg-harbor.docs.renner.dev/getting-started/configuration/)
+- [Storage backends](https://vcpkg-harbor.docs.renner.dev/user-guide/storage-backends/)
+- [Dashboard](https://vcpkg-harbor.docs.renner.dev/user-guide/dashboard/)
+- [Docker deployment](https://vcpkg-harbor.docs.renner.dev/deployment/docker/)
+- [Kubernetes deployment](https://vcpkg-harbor.docs.renner.dev/deployment/kubernetes/)
 
 ## Development
 
 ```bash
-# Setup development environment
-./scripts/setup-dev.sh
+./scripts/setup-dev.sh    # create .venv and install dev dependencies
+./scripts/dev-server.sh   # run the server with auto-reload
+./scripts/test.sh         # pytest with coverage
+./scripts/lint.sh         # ruff check, ruff format --check, mypy
+```
 
-# Start development server
-./scripts/dev-server.sh
+The documentation site lives in [`docs/`](docs) and is built with Astro Starlight:
 
-# Run tests
-./scripts/test.sh
-
-# Run linter
-./scripts/lint.sh
+```bash
+cd docs
+npm install
+npm run dev
 ```
 
 ## Contributing
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
+Contributions are welcome — see the [contributing guide](CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
 
 ## Acknowledgments
 
 - [vcpkg](https://github.com/microsoft/vcpkg) - C++ package manager by Microsoft
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
-- [MinIO](https://min.io/) - High-performance object storage
+- [FastAPI](https://fastapi.tiangolo.com/) - Python web framework
+- [MinIO](https://min.io/) - S3 compatible object storage
