@@ -1,90 +1,60 @@
 {% extends "base.html" %}
+{% from "_macros.html" import icon, stat_card, timestamp %}
 
 {% block title %}{{ name }} - vcpkg-harbor{% endblock %}
 
 {% block page_title %}{{ name }}{% endblock %}
 
+{% block page_description %}
+{% if versions|length == 1 %}
+<p class="mt-2 text-sm text-slate-500">1 cached build, {{ total_size|filesize }} in total.</p>
+{% else %}
+<p class="mt-2 text-sm text-slate-500">{{ versions|length|count }} cached builds, {{ total_size|filesize }} in total.</p>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <div class="space-y-6">
-    <!-- Package Info -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex justify-between items-start">
-            <div>
-                <h2 class="text-2xl font-bold text-gray-900">{{ name }}</h2>
-                <p class="text-gray-500 mt-1">
-                    {{ versions|length }} version{% if versions|length != 1 %}s{% endif %} cached
-                </p>
-            </div>
-            <div class="text-right">
-                <span class="text-2xl font-bold text-indigo-600">
-                    {% if total_size >= 1073741824 %}
-                        {{ "%.2f"|format(total_size / 1073741824) }} GB
-                    {% elif total_size >= 1048576 %}
-                        {{ "%.2f"|format(total_size / 1048576) }} MB
-                    {% elif total_size >= 1024 %}
-                        {{ "%.2f"|format(total_size / 1024) }} KB
-                    {% else %}
-                        {{ total_size }} B
-                    {% endif %}
-                </span>
-                <p class="text-gray-500 text-sm">Total Size</p>
-            </div>
-        </div>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:gap-6">
+        {{ stat_card("Cached builds", versions|length|count, "package") }}
+        {{ stat_card("Total size", total_size|filesize, "storage") }}
+        {{ stat_card("Triplets", versions|map(attribute="triplet")|unique|list|length|count, "activity") }}
     </div>
 
-    <!-- Versions List -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-900">Cached Versions</h3>
+    <!-- Versions list -->
+    <section class="card overflow-hidden" aria-labelledby="versions-title">
+        <div class="card-header">
+            <h2 id="versions-title" class="card-title">Cached builds</h2>
         </div>
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Triplet</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SHA</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cached</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {% for version in versions %}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                        {{ version.version }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{ version.triplet }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                        {{ version.sha[:12] }}...
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {% set size = version.size %}
-                        {% if size >= 1073741824 %}
-                            {{ "%.2f"|format(size / 1073741824) }} GB
-                        {% elif size >= 1048576 %}
-                            {{ "%.2f"|format(size / 1048576) }} MB
-                        {% elif size >= 1024 %}
-                            {{ "%.2f"|format(size / 1024) }} KB
-                        {% else %}
-                            {{ size }} B
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{ version.created_at or '-' }}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        <div class="table-wrap">
+            <table class="min-w-full divide-y divide-slate-200">
+                <caption class="sr-only">Cached builds of {{ name }}</caption>
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th scope="col" class="th">Version</th>
+                        <th scope="col" class="th">Triplet</th>
+                        <th scope="col" class="th">ABI hash</th>
+                        <th scope="col" class="th-num">Size</th>
+                        <th scope="col" class="th-num">Cached</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for version in versions %}
+                    <tr class="row">
+                        <td class="td font-medium text-slate-900">{{ version.version }}</td>
+                        <td class="td font-mono text-xs">{{ version.triplet }}</td>
+                        <td class="td font-mono text-xs" title="{{ version.sha }}">{{ version.sha[:12] }}…</td>
+                        <td class="td-num">{{ version.size|filesize }}</td>
+                        <td class="td-num">{{ timestamp(version.created_at) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
 
-    <!-- Back Link -->
     <div>
-        <a href="/packages" class="text-indigo-600 hover:text-indigo-900">
-            &larr; Back to packages
-        </a>
+        <a href="/packages" class="btn-secondary">{{ icon("arrow-left", "h-4 w-4") }} Back to packages</a>
     </div>
 </div>
 {% endblock %}

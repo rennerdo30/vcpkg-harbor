@@ -1,81 +1,82 @@
 {% extends "base.html" %}
+{% from "_macros.html" import data_row, icon %}
 
 {% block title %}Dashboard - vcpkg-harbor{% endblock %}
 
 {% block page_title %}Dashboard{% endblock %}
 
+{% block page_description %}
+<p class="mt-2 max-w-2xl text-sm text-slate-500">
+    Live view of this binary cache. Figures refresh automatically every 30 seconds.
+</p>
+{% endblock %}
+
 {% block content %}
+{% set binary_source = 'clear;http,http://' ~ request.headers.get('host', 'localhost:15151') ~ '/{name}/{version}/{sha}/{triplet},readwrite' %}
 <div class="space-y-6">
-    <!-- Stats Overview -->
+    <!-- Stats overview -->
     <div id="stats-summary" hx-get="/partials/stats-summary" hx-trigger="every 30s" hx-swap="innerHTML">
         {% include "partials/stats_summary.html" %}
     </div>
 
-    <!-- Recent Activity -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Recent Packages -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h2 class="text-lg font-semibold text-gray-900">Recent Packages</h2>
-                <span class="htmx-indicator text-gray-400 text-sm">Loading...</span>
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <!-- Recent packages -->
+        <section class="card overflow-hidden" aria-labelledby="recent-packages-title">
+            <div class="card-header">
+                <h2 id="recent-packages-title" class="card-title">Recent uploads</h2>
+                <span class="htmx-indicator flex items-center gap-2 text-xs text-slate-500">
+                    <span class="spinner" aria-hidden="true"></span> Updating…
+                </span>
             </div>
-            <div id="recent-packages" hx-get="/partials/recent-packages" hx-trigger="every 30s" hx-swap="innerHTML">
+            <div id="recent-packages" hx-get="/partials/recent-packages" hx-trigger="every 30s" hx-swap="innerHTML"
+                aria-live="polite">
                 {% include "partials/recent_packages.html" %}
             </div>
-        </div>
+        </section>
 
-        <!-- Quick Stats -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h2 class="text-lg font-semibold text-gray-900">Cache Performance</h2>
+        <!-- Cache performance -->
+        <section class="card" aria-labelledby="cache-performance-title">
+            <div class="card-header">
+                <h2 id="cache-performance-title" class="card-title">Cache performance</h2>
+                <span class="badge {% if cache_stats.hit_rate > 80 %}bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100{% elif cache_stats.hit_rate > 50 %}bg-amber-50 text-amber-700 ring-1 ring-amber-100{% else %}bg-slate-100 text-slate-600 ring-1 ring-slate-200{% endif %}">
+                    {{ "%.1f"|format(cache_stats.hit_rate) }}% hit rate
+                </span>
             </div>
-            <div class="p-6">
-                <dl class="space-y-4">
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Hit Rate</dt>
-                        <dd class="font-semibold {% if cache_stats.hit_rate > 80 %}text-green-600{% elif cache_stats.hit_rate > 50 %}text-yellow-600{% else %}text-red-600{% endif %}">
-                            {{ "%.1f"|format(cache_stats.hit_rate) }}%
-                        </dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Total Downloads</dt>
-                        <dd class="font-semibold text-gray-900">{{ cache_stats.downloads }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Total Uploads</dt>
-                        <dd class="font-semibold text-gray-900">{{ cache_stats.uploads }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Errors</dt>
-                        <dd class="font-semibold {% if cache_stats.errors > 0 %}text-red-600{% else %}text-green-600{% endif %}">
-                            {{ cache_stats.errors }}
-                        </dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Storage Backend</dt>
-                        <dd class="font-semibold text-gray-900">{{ cache_stats.backend_type }}</dd>
-                    </div>
+            <div class="card-body">
+                <dl class="space-y-3">
+                    {{ data_row("Cache hits", cache_stats.cache_hits|count) }}
+                    {{ data_row("Cache misses", cache_stats.cache_misses|count) }}
+                    {{ data_row("Downloads", cache_stats.downloads|count) }}
+                    {{ data_row("Uploads", cache_stats.uploads|count) }}
+                    {{ data_row("Errors", cache_stats.errors|count, "text-rose-600" if cache_stats.errors else "text-slate-900") }}
+                    {{ data_row("Storage backend", cache_stats.backend_type) }}
                 </dl>
             </div>
-        </div>
+        </section>
     </div>
 
-    <!-- Usage Instructions -->
-    <div class="bg-white rounded-lg shadow">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Quick Start</h2>
+    <!-- Usage instructions -->
+    <section class="card" aria-labelledby="quick-start-title">
+        <div class="card-header">
+            <h2 id="quick-start-title" class="card-title">Connect vcpkg</h2>
+            <a class="link text-sm" href="https://vcpkg-harbor.docs.renner.dev/getting-started/quickstart/"
+                target="_blank" rel="noopener noreferrer">Quick start guide</a>
         </div>
-        <div class="p-6">
-            <p class="text-gray-600 mb-4">Configure vcpkg to use this binary cache:</p>
-            <div class="bg-gray-800 rounded-lg p-4 overflow-x-auto">
-                <code class="text-green-400 text-sm">
-                    export VCPKG_BINARY_SOURCES="clear;http,http://{{ request.headers.get('host', 'localhost:15151') }}/{% raw %}{name}/{version}/{sha}/{triplet}{% endraw %},readwrite"
-                </code>
+        <div class="card-body">
+            <p class="text-sm text-slate-600">Set this environment variable before running vcpkg:</p>
+            <div class="code-block mt-3 flex items-start justify-between gap-4">
+                <code
+                    class="block min-w-0 flex-1 overflow-x-auto whitespace-pre pb-1">export VCPKG_BINARY_SOURCES="{{ binary_source }}"</code>
+                <button type="button" class="btn-icon shrink-0" data-copy="export VCPKG_BINARY_SOURCES=&quot;{{ binary_source }}&quot;">
+                    {{ icon("copy", "h-4 w-4") }}
+                    <span data-copy-label>Copy</span>
+                </button>
             </div>
-            <p class="text-gray-500 text-sm mt-4">
-                Then run <code class="bg-gray-100 px-1 rounded">vcpkg install &lt;package&gt;</code> to automatically cache binaries.
+            <p class="mt-3 text-sm text-slate-500">
+                Then run <code class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">vcpkg install
+                    &lt;package&gt;</code> and binaries are cached here automatically.
             </p>
         </div>
-    </div>
+    </section>
 </div>
 {% endblock %}

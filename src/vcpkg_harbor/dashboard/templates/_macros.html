@@ -1,0 +1,64 @@
+{#
+  Shared UI macros for the vcpkg-harbor dashboard.
+
+  Icons are inline SVG paths (Heroicons outline set) so the dashboard needs no
+  icon font or extra request. Keep the path table as the single source of truth
+  instead of pasting <svg> markup into page templates.
+#}
+{% set ICON_PATHS = {
+  "package": "M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z",
+  "storage": "M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125",
+  "activity": "M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z",
+  "speed": "M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z",
+  "clock": "M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z",
+  "search": "M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z",
+  "copy": "M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m0 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184",
+  "check": "M4.5 12.75l6 6 9-13.5",
+  "warning": "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z",
+  "download": "M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3",
+  "arrow-left": "M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+} %}
+
+{#- Render an inline icon. `name` must be a key of ICON_PATHS. -#}
+{% macro icon(name, classes="h-5 w-5") -%}
+<svg class="{{ classes }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+  aria-hidden="true" focusable="false">
+  <path stroke-linecap="round" stroke-linejoin="round" d="{{ ICON_PATHS[name] }}" />
+</svg>
+{%- endmacro %}
+
+{#- A single dashboard metric tile. -#}
+{% macro stat_card(label, value, icon_name="package") -%}
+<div class="stat-card">
+  <span class="stat-icon">{{ icon(icon_name) }}</span>
+  <div class="min-w-0">
+    <p class="stat-label">{{ label }}</p>
+    <p class="stat-value">{{ value }}</p>
+  </div>
+</div>
+{%- endmacro %}
+
+{#- One row of a definition list, e.g. "Cache hits  1,024". -#}
+{% macro data_row(label, value, value_classes="text-slate-900") -%}
+<div class="flex items-baseline justify-between gap-4 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+  <dt class="text-sm text-slate-600">{{ label }}</dt>
+  <dd class="text-sm font-semibold tabular-nums {{ value_classes }}">{{ value }}</dd>
+</div>
+{%- endmacro %}
+
+{#- Empty state shown inside cards and tables. -#}
+{% macro empty_state(title, hint="", icon_name="package") -%}
+<div class="flex flex-col items-center gap-3 px-6 py-12 text-center">
+  <span class="grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-400">
+    {{ icon(icon_name, "h-6 w-6") }}
+  </span>
+  <p class="text-sm font-medium text-slate-900">{{ title }}</p>
+  {% if hint %}<p class="max-w-sm text-sm text-slate-500">{{ hint }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{#- Timestamp with a machine-readable value; app.js localises the text. -#}
+{% macro timestamp(value) -%}
+{% if value %}<time datetime="{{ value }}" data-datetime title="{{ value }}">{{ value|datetime }}</time>{% else %}<span
+  class="text-slate-400" aria-label="Unknown">&mdash;</span>{% endif %}
+{%- endmacro %}
