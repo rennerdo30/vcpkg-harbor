@@ -31,6 +31,23 @@ class PackageAlreadyExistsError(VcpkgHarborError):
         super().__init__(f"Package already exists: {name}/{version}/{sha}/{triplet}")
 
 
+class InvalidTagError(VcpkgHarborError):
+    """Raised when a build tag is malformed or not permitted."""
+
+    def __init__(self, tag: str, reason: str) -> None:
+        self.tag = tag
+        self.reason = reason
+        super().__init__(f"Invalid build tag {tag!r}: {reason}")
+
+
+class TagsDisabledError(VcpkgHarborError):
+    """Raised when a tagged request arrives while build tags are disabled."""
+
+    def __init__(self, tag: str) -> None:
+        self.tag = tag
+        super().__init__(f"Build tags are disabled, cannot serve tag {tag!r}")
+
+
 class StorageError(VcpkgHarborError):
     """Raised when a storage operation fails."""
 

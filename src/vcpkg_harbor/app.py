@@ -20,7 +20,7 @@ from vcpkg_harbor.auth import (
 from vcpkg_harbor.core.config import Settings, get_settings
 from vcpkg_harbor.core.logging import setup_logging
 from vcpkg_harbor.dashboard import router as dashboard_router
-from vcpkg_harbor.services import CacheService, PackageService, StatsService
+from vcpkg_harbor.services import CacheService, PackageService, StatsService, TagService
 from vcpkg_harbor.storage.registry import get_storage_backend
 
 logger = structlog.get_logger(__name__)
@@ -50,7 +50,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
 
     # Initialize services
-    app.state.cache_service = CacheService(storage, settings)
+    tag_service = TagService(storage, settings)
+    app.state.tag_service = tag_service
+    app.state.cache_service = CacheService(storage, settings, tag_service)
     app.state.stats_service = StatsService(storage)
     app.state.package_service = PackageService(storage)
 
@@ -59,6 +61,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Server running in READ-ONLY mode")
     if settings.server.write_only:
         logger.info("Server running in WRITE-ONLY mode")
+    if settings.tags.enabled:
+        logger.info(
+            "Build tags enabled",
+            default_namespace=settings.tags.default_namespace,
+            dedupe=settings.tags.dedupe,
+            allowlist=sorted(settings.tags.allowlist) or None,
+            max_packages_per_tag=settings.tags.max_packages_per_tag or None,
+            max_bytes_per_tag=settings.tags.max_bytes_per_tag or None,
+        )
+    else:
+        logger.info("Build tags disabled")
 
     yield
 

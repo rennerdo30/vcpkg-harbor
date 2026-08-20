@@ -6,11 +6,14 @@ from unittest import mock
 import pytest
 
 from vcpkg_harbor.core.config import (
+    DEFAULT_NAMESPACE,
+    DEFAULT_TAG_PATTERN,
     LoggingSettings,
     MinioSettings,
     ServerSettings,
     Settings,
     StorageSettings,
+    TagSettings,
 )
 
 
@@ -60,6 +63,64 @@ def test_settings_aggregation():
     assert hasattr(settings, "minio")
     assert hasattr(settings, "logging")
     assert hasattr(settings, "auth")
+    assert hasattr(settings, "tags")
+
+
+@mock.patch.dict(os.environ, {}, clear=True)
+def test_default_tag_settings():
+    """Test default build tag settings."""
+    settings = TagSettings(_env_file=None)
+    assert settings.enabled is True
+    assert settings.dedupe is True
+    assert settings.allowed is None
+    assert settings.allowlist == frozenset()
+    assert settings.pattern == DEFAULT_TAG_PATTERN
+    assert settings.default_namespace == DEFAULT_NAMESPACE
+    assert settings.max_packages_per_tag == 0
+    assert settings.max_bytes_per_tag == 0
+
+
+@mock.patch.dict(
+    os.environ,
+    {
+        "VCPKG_TAGS_ENABLED": "false",
+        "VCPKG_TAGS_ALLOWED": "nightly, release ,",
+        "VCPKG_TAGS_DEDUPE": "false",
+        "VCPKG_TAGS_DEFAULT_NAMESPACE": "_shared",
+        "VCPKG_TAGS_MAX_PACKAGES_PER_TAG": "25",
+        "VCPKG_TAGS_MAX_BYTES_PER_TAG": "1024",
+    },
+    clear=True,
+)
+def test_tag_settings_from_environment():
+    """Test that build tag settings are read from VCPKG_TAGS_* variables."""
+    settings = TagSettings(_env_file=None)
+    assert settings.enabled is False
+    assert settings.dedupe is False
+    assert settings.allowlist == frozenset({"nightly", "release"})
+    assert settings.default_namespace == "_shared"
+    assert settings.max_packages_per_tag == 25
+    assert settings.max_bytes_per_tag == 1024
+
+
+def test_tag_pattern_must_compile():
+    """Test that an invalid tag pattern is rejected."""
+    with pytest.raises(ValueError):
+        TagSettings(pattern="[unclosed", _env_file=None)
+
+
+def test_default_namespace_must_be_a_single_segment():
+    """Test that the default namespace cannot contain path separators."""
+    with pytest.raises(ValueError):
+        TagSettings(default_namespace="a/b", _env_file=None)
+    with pytest.raises(ValueError):
+        TagSettings(default_namespace="", _env_file=None)
+
+
+def test_retention_limits_cannot_be_negative():
+    """Test that retention limits are non-negative."""
+    with pytest.raises(ValueError):
+        TagSettings(max_packages_per_tag=-1, _env_file=None)
 
 
 def test_get_storage_config():
