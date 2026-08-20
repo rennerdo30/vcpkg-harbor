@@ -71,6 +71,22 @@ cp .env.example .env
 | `VCPKG_GCS_PROJECT` | - | GCP project ID |
 | `VCPKG_GCS_CREDENTIALS_FILE` | - | Path to service account JSON |
 
+## Build Tag Settings
+
+Build tags let independent build streams share one server while keeping separate
+views of the cache. See [Build Tags](../user-guide/build-tags.md) for the full
+picture.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VCPKG_TAGS_ENABLED` | `true` | Accept an optional build tag as the first path segment. `false` restores the pre-tag behaviour exactly |
+| `VCPKG_TAGS_ALLOWED` | - | Comma-separated allowlist of tag names. Empty means any name matching the pattern is accepted |
+| `VCPKG_TAGS_PATTERN` | `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` | Regular expression every tag name must match |
+| `VCPKG_TAGS_DEFAULT_NAMESPACE` | `_default` | Namespace name used for untagged (4 segment) requests |
+| `VCPKG_TAGS_DEDUPE` | `true` | Store each package once and let tags reference it with reference counting. `false` gives every tag a private copy |
+| `VCPKG_TAGS_MAX_PACKAGES_PER_TAG` | `0` | Maximum number of packages kept per tag (`0` = unlimited) |
+| `VCPKG_TAGS_MAX_BYTES_PER_TAG` | `0` | Maximum total package size kept per tag in bytes (`0` = unlimited) |
+
 ## Logging Settings
 
 | Variable | Default | Description |
@@ -119,4 +135,12 @@ VCPKG_STORAGE_TYPE=filesystem
 VCPKG_STORAGE_PATH=./cache
 VCPKG_LOG_LEVEL=DEBUG
 VCPKG_SERVER_RELOAD=true
+```
+
+### Shared Server with Build Streams
+
+```bash
+VCPKG_TAGS_ENABLED=true
+VCPKG_TAGS_ALLOWED=nightly,release,ci
+VCPKG_TAGS_MAX_PACKAGES_PER_TAG=500
 ```

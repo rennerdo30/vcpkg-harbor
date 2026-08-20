@@ -30,6 +30,7 @@ vcpkg-harbor caches compiled C++ packages, allowing teams to share pre-built bin
 ## Features
 
 - 🚀 **Multiple Storage Backends** - MinIO, AWS S3, Azure Blob, Google Cloud Storage, or local filesystem
+- 🏷️ **Build Tags** - Nightly, release and per-PR streams share one server with isolated views, deduplicated storage and reference counting
 - 🔌 **Plugin Architecture** - Easy to add custom storage backends via entry points
 - 📊 **Web Dashboard** - Monitor cache statistics and browse packages in real-time
 - 📈 **Prometheus Metrics** - Built-in metrics endpoint for monitoring and alerting
@@ -110,7 +111,32 @@ VCPKG_LOG_LEVEL=INFO
 VCPKG_AUTH_ENABLED=true
 VCPKG_AUTH_TYPE=token
 VCPKG_AUTH_TOKEN=your-secret-token
+
+# Build tags (optional)
+VCPKG_TAGS_ENABLED=true          # accept /{tag}/... paths
+VCPKG_TAGS_ALLOWED=nightly,release,ci   # only these tag names (default: any valid name)
+VCPKG_TAGS_DEDUPE=true           # store each package once, reference count it across tags
+VCPKG_TAGS_MAX_PACKAGES_PER_TAG=0       # per-tag retention limit (0 = unlimited)
 ```
+
+See the [configuration reference](https://rennerdo30.github.io/vcpkg-harbor/getting-started/configuration/)
+for every variable.
+
+## Build Tags
+
+Independent build streams can share one server while keeping separate views of
+the cache. The tag is just a leading path segment, so only the base URL changes -
+no vcpkg client changes are needed:
+
+```bash
+export VCPKG_BINARY_SOURCES="clear;http,http://localhost:15151/nightly/{name}/{version}/{sha}/{triplet},readwrite"
+```
+
+Tags are isolated (a `nightly` package is not served to `release`), yet each
+package is stored only once and reference counted, so deleting it from one tag
+leaves the others working. Untagged requests keep the previous behaviour and
+storage layout, so existing caches keep working without migration. See the
+[build tags guide](https://rennerdo30.github.io/vcpkg-harbor/user-guide/build-tags/).
 
 ## API Endpoints
 
@@ -119,6 +145,8 @@ VCPKG_AUTH_TOKEN=your-secret-token
 | `/{name}/{version}/{sha}/{triplet}` | HEAD | Check if package exists |
 | `/{name}/{version}/{sha}/{triplet}` | GET | Download package |
 | `/{name}/{version}/{sha}/{triplet}` | PUT | Upload package |
+| `/{name}/{version}/{sha}/{triplet}` | DELETE | Delete package |
+| `/{tag}/{name}/{version}/{sha}/{triplet}` | HEAD, GET, PUT, DELETE | Same operations, scoped to a build tag |
 | `/health` | GET | Health check |
 | `/metrics` | GET | Prometheus metrics |
 | `/` | GET | Web dashboard |
@@ -131,6 +159,7 @@ VCPKG_AUTH_TOKEN=your-secret-token
 - [Quick Start](https://rennerdo30.github.io/vcpkg-harbor/getting-started/quickstart/)
 - [Configuration](https://rennerdo30.github.io/vcpkg-harbor/getting-started/configuration/)
 - [Storage Backends](https://rennerdo30.github.io/vcpkg-harbor/user-guide/storage-backends/)
+- [Build Tags](https://rennerdo30.github.io/vcpkg-harbor/user-guide/build-tags/)
 - [Docker Deployment](https://rennerdo30.github.io/vcpkg-harbor/deployment/docker/)
 - [Kubernetes Deployment](https://rennerdo30.github.io/vcpkg-harbor/deployment/kubernetes/)
 

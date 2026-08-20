@@ -22,6 +22,19 @@ If authentication is enabled, include the appropriate header:
 
 ## Cache API
 
+Every cache endpoint is served in two shapes: the plain path shown below, and the
+same path prefixed with a build tag.
+
+```http
+HEAD|GET|PUT|DELETE /{tag}/{name}/{version}/{sha}/{triplet}
+HEAD|GET|PUT|DELETE /{name}/{version}/{sha}/{triplet}
+```
+
+The tagged shape addresses one build stream's isolated view of the cache, the
+untagged shape addresses the default namespace. A tag that is malformed or not
+allowlisted returns `400 Bad Request`; if build tags are disabled the tagged
+shape returns `404 Not Found`. See [Build Tags](./user-guide/build-tags.md).
+
 ### Check Package Exists
 
 Check if a package exists in the cache.
@@ -127,9 +140,20 @@ curl -X PUT --data-binary @package.zip \
   "version": "1.2.13",
   "sha": "abc123def456",
   "size": 1234567,
-  "etag": "d41d8cd98f00b204e9800998ecf8427e"
+  "etag": "d41d8cd98f00b204e9800998ecf8427e",
+  "tag": null,
+  "namespace": "_default",
+  "deduplicated": false,
+  "evicted": 0
 }
 ```
+
+| Field | Description |
+|-------|-------------|
+| tag | The build tag from the request path, `null` when untagged |
+| namespace | The namespace the package was stored in |
+| deduplicated | `true` when the bytes were already stored and only a reference was added |
+| evicted | Number of packages the tag's retention limits evicted |
 
 ---
 
@@ -145,9 +169,12 @@ DELETE /{name}/{version}/{sha}
 
 | Status | Description |
 |--------|-------------|
-| 200 | Package deleted |
-| 404 | Package not found |
+| 200 | Package removed from the addressed namespace |
+| 404 | The namespace does not hold the package |
 | 403 | Server is read-only |
+
+With build tags, a delete only drops the addressed namespace's reference. The
+stored bytes are removed once the last reference is gone.
 
 ---
 

@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Build tags** - An optional first path segment scopes the vcpkg protocol to a
+  build stream: `/{tag}/{name}/{version}/{sha}/{triplet}`. Tags are isolated from
+  each other and from the untagged namespace, and need no vcpkg client change
+  because the tag is part of the configured base URL
+- **Content deduplication with reference counting** - A package is stored once
+  per identity (`name/version/sha/triplet`); tags reference it. Uploading a
+  package another tag already holds stores no new bytes, and deleting it from one
+  tag keeps the others working until the last reference is gone
+- **Per-tag retention limits** - `VCPKG_TAGS_MAX_PACKAGES_PER_TAG` and
+  `VCPKG_TAGS_MAX_BYTES_PER_TAG` evict a tag's oldest entries
+- **Tag validation** - `VCPKG_TAGS_PATTERN` and `VCPKG_TAGS_ALLOWED` reject
+  unknown tag names with `400` instead of silently creating a namespace
+- **Storage backend metadata API** - `put_metadata`, `get_metadata`,
+  `delete_metadata` and `list_metadata` let the tag index work identically on
+  every backend; package operations take an optional `scope` prefix
+
+### Changed
+
+- Package uploads report `tag`, `namespace`, `deduplicated` and `evicted`
+- `list_packages` now uses a shared key parser on every backend, so harbor's own
+  bookkeeping documents are never reported as packages
+
+### Compatibility
+
+- The untagged routes and their storage layout are unchanged, so existing caches
+  keep working with no migration. Packages written before this release stay
+  readable through the untagged routes and are adopted into the default namespace
+  the first time they are tagged. `VCPKG_TAGS_ENABLED=false` restores the exact
+  previous behaviour
+
 ## [2.0.0] - 2025-01-19
 
 ### Added
