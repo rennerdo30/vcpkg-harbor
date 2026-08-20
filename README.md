@@ -144,6 +144,14 @@ VCPKG_AUTH_TOKEN=your-secret-token
 # Dashboard and metrics
 VCPKG_DASHBOARD_ENABLED=true
 VCPKG_METRICS_ENABLED=true
+# local serves Tailwind and HTMX from /static; cdn loads them from jsDelivr
+VCPKG_DASHBOARD_ASSETS=local
+
+# Reverse proxy (only needed when not served from the domain root)
+VCPKG_PROXY_ROOT_PATH=/harbor
+VCPKG_PROXY_FORWARDED_ALLOW_IPS=10.0.0.1
+# Restrict who may embed the dashboard; unset means anyone may
+VCPKG_PROXY_FRAME_ANCESTORS="'self' https://portal.example.com"
 ```
 
 ## API endpoints
@@ -170,6 +178,13 @@ The dashboard is served from the same process as the cache API:
 
 It is server-rendered with Jinja2 and Tailwind CSS, and refreshes its figures in
 place with HTMX — no build step and no JavaScript bundle.
+
+Every link, asset and background request is built relative to the path the
+application is mounted under, so the dashboard also works behind a reverse proxy
+that serves it below the domain root (`VCPKG_PROXY_ROOT_PATH=/harbor`) and inside
+an `<iframe>` on another page. Tailwind and HTMX are served from `/static` by
+default and no markup is inline, so a strict `Content-Security-Policy` on the
+embedding page still leaves a working dashboard.
 
 ## Tech stack
 

@@ -97,6 +97,58 @@ cp .env.example .env
 | `VCPKG_METRICS_PATH` | `/metrics` | Metrics endpoint path |
 | `VCPKG_DASHBOARD_ENABLED` | `true` | Enable web dashboard |
 | `VCPKG_DASHBOARD_PATH` | `/` | Dashboard base path |
+| `VCPKG_DASHBOARD_ASSETS` | `local` | Where the dashboard loads Tailwind CSS and HTMX from: `local` (vendored under `/static`) or `cdn` |
+
+## Reverse Proxy Settings
+
+Needed when vcpkg-harbor is not served from the root of a domain, or when the
+dashboard is embedded in another page.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VCPKG_PROXY_ROOT_PATH` | - | Path prefix the application is served under, e.g. `/harbor`. Equivalent to uvicorn's `--root-path` |
+| `VCPKG_PROXY_FORWARDED_ALLOW_IPS` | - | Client IPs trusted to send `X-Forwarded-*` headers, or `*` for any |
+| `VCPKG_PROXY_FRAME_ANCESTORS` | - | `Content-Security-Policy: frame-ancestors` value, e.g. `'self' https://intranet.example.com`. Unset means no header, so any page may embed the dashboard |
+| `VCPKG_PROXY_FRAME_OPTIONS` | - | `X-Frame-Options` value: `DENY` or `SAMEORIGIN`. Unset means no header |
+
+### Serving under a sub-path
+
+With `VCPKG_PROXY_ROOT_PATH` set, every link, asset and dashboard background
+request is generated with the prefix, so the dashboard also works inside an
+`<iframe>` on another page. Both common proxy layouts are supported - one that
+forwards the prefix and one that strips it:
+
+```nginx
+# Forwards /harbor/... unchanged (recommended)
+location /harbor/ {
+    proxy_pass http://127.0.0.1:15151;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+```nginx
+# Strips the prefix before forwarding; note the trailing slash
+location /harbor/ {
+    proxy_pass http://127.0.0.1:15151/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Prefer the first form. A stripping proxy cannot be told apart from a genuine
+request when a cached package happens to be named after the prefix, so
+`/harbor/1.0/<sha>/x64-linux` would be read as the prefix plus a three-segment
+path and answered with 404.
+
+### Embedding without internet access
+
+`VCPKG_DASHBOARD_ASSETS=local`, the default, serves Tailwind CSS and HTMX from
+`/static`, so the dashboard renders on an air-gapped host and inside a page
+served with a strict `Content-Security-Policy` (no inline scripts or styles and
+no third-party origins are needed). Set it to `cdn` to load both from jsDelivr
+instead, which compiles the stylesheet in the browser and therefore needs
+`style-src 'unsafe-inline'`.
 
 ## Example Configurations
 
@@ -119,4 +171,13 @@ VCPKG_STORAGE_TYPE=filesystem
 VCPKG_STORAGE_PATH=./cache
 VCPKG_LOG_LEVEL=DEBUG
 VCPKG_SERVER_RELOAD=true
+```
+
+### Behind a Reverse Proxy, Dashboard Embedded in an Intranet Portal
+
+```bash
+VCPKG_PROXY_ROOT_PATH=/harbor
+VCPKG_PROXY_FORWARDED_ALLOW_IPS=10.0.0.1
+VCPKG_PROXY_FRAME_ANCESTORS="'self' https://portal.example.com"
+VCPKG_DASHBOARD_ASSETS=local
 ```
