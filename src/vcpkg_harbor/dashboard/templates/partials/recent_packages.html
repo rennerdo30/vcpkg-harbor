@@ -5,7 +5,7 @@
     <li class="row px-5 py-3 sm:px-6">
         <div class="flex items-center justify-between gap-4">
             <div class="min-w-0">
-                <a href="/packages/{{ pkg.name }}" class="link">{{ pkg.name }}</a>
+                <a href="{{ url_path('package_detail', name=pkg.name) }}" class="link">{{ pkg.name }}</a>
                 <p class="truncate text-xs text-slate-500">
                     <span class="font-mono">{{ pkg.version }}</span>
                     <span aria-hidden="true">·</span>

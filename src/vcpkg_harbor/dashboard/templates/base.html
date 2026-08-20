@@ -7,77 +7,29 @@
     <meta name="description" content="vcpkg-harbor - binary cache server for vcpkg.">
     <meta name="theme-color" content="#3730a3">
     <meta name="color-scheme" content="light">
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="{{ url_path('static', path='favicon.svg') }}">
     <title>{% block title %}vcpkg-harbor{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // Design tokens for the dashboard. `brand` mirrors the indigo ramp of the
-        // logo so accent colours live in one place instead of being sprinkled
-        // across templates.
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#eef2ff',
-                            100: '#e0e7ff',
-                            200: '#c7d2fe',
-                            300: '#a5b4fc',
-                            400: '#818cf8',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                            800: '#3730a3',
-                            900: '#312e81'
-                        }
-                    },
-                    boxShadow: {
-                        card: '0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06)'
-                    }
-                }
-            }
-        };
-    </script>
-    <style type="text/tailwindcss">
-        @layer components {
-            /* Surfaces */
-            .card { @apply rounded-xl bg-white shadow-card ring-1 ring-slate-900/5; }
-            .card-header { @apply flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 px-5 py-4 sm:px-6; }
-            .card-title { @apply text-base font-semibold tracking-tight text-slate-900; }
-            .card-body { @apply px-5 py-5 sm:px-6; }
-
-            /* Metric tiles */
-            .stat-card { @apply flex items-start gap-4 rounded-xl bg-white p-5 shadow-card ring-1 ring-slate-900/5; }
-            .stat-icon { @apply grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100; }
-            .stat-label { @apply text-xs font-medium uppercase tracking-wide text-slate-500; }
-            .stat-value { @apply mt-1 truncate text-2xl font-semibold tracking-tight tabular-nums text-slate-900 sm:text-3xl; }
-
-            /* Controls */
-            .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-brand-700 active:bg-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2; }
-            .btn-secondary { @apply inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-card ring-1 ring-slate-300 transition-colors duration-150 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2; }
-            .btn-icon { @apply inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400; }
-            .input-search { @apply w-full rounded-lg border-0 bg-white py-2 pl-10 pr-3 text-sm text-slate-900 shadow-card ring-1 ring-slate-300 transition placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500; }
-
-            /* Links */
-            .link { @apply rounded font-medium text-brand-700 underline-offset-2 transition-colors hover:text-brand-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500; }
-            .nav-link { @apply whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-brand-100 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80; }
-            .nav-link-active { @apply bg-white/15 text-white ring-1 ring-inset ring-white/25; }
-            .footer-link { @apply rounded text-slate-500 transition-colors hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500; }
-
-            /* Tables */
-            .table-wrap { @apply overflow-x-auto; }
-            .th { @apply whitespace-nowrap px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6; }
-            .th-num { @apply whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6; }
-            .td { @apply whitespace-nowrap px-5 py-4 text-sm text-slate-600 sm:px-6; }
-            .td-num { @apply whitespace-nowrap px-5 py-4 text-right text-sm tabular-nums text-slate-600 sm:px-6; }
-            .row { @apply transition-colors hover:bg-slate-50; }
-
-            /* Misc */
-            .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
-            .code-block { @apply overflow-x-auto rounded-lg bg-slate-900 px-4 py-3 text-sm text-brand-200; }
-        }
-    </style>
-    <link rel="stylesheet" href="/static/css/style.css">
+    {#
+      HTMX injects its own indicator rules as an inline <style>, which a page
+      served with a strict Content-Security-Policy blocks. static/css/style.css
+      carries the same rules, so switch the injection off - declaratively, since
+      an inline <script> would be blocked for the same reason.
+    #}
+    <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
+    {#
+      Tailwind: the vendored build by default, so the dashboard also renders
+      inside a page with a strict Content-Security-Policy or on a host without
+      internet access. With dashboard.assets = "cdn" the same source file is
+      compiled in the browser instead. Both share static/src/tailwind.css.
+    #}
+    {% if assets.from_cdn %}
+    <script src="{{ assets.tailwind_cdn }}"></script>
+    {# The source is a file we ship, so it is inlined verbatim. #}
+    <style type="text/tailwindcss">{{ assets.tailwind_source|safe }}</style>
+    {% else %}
+    <link rel="stylesheet" href="{{ assets.tailwind_css }}">
+    {% endif %}
+    <link rel="stylesheet" href="{{ url_path('static', path='css/style.css') }}">
     {% block head %}{% endblock %}
 </head>
 
@@ -87,29 +39,25 @@
         Skip to main content
     </a>
 
-    {% set nav_items = [
-    {'href': '/', 'label': 'Dashboard', 'exact': true},
-    {'href': '/packages', 'label': 'Packages', 'exact': false},
-    {'href': '/stats', 'label': 'Statistics', 'exact': true}
-    ] %}
+    {# `nav_items` comes from the dashboard context processor: prefixed hrefs
+       plus the active entry, both derived from the routes. #}
 
     <!-- Navigation -->
     <header class="sticky top-0 z-40 bg-brand-800">
         <nav class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" aria-label="Main">
             <div class="flex h-16 items-center justify-between gap-4">
                 <div class="flex min-w-0 items-center gap-6">
-                    <a href="/"
+                    <a href="{{ url_path('dashboard_home') }}"
                         class="flex shrink-0 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80">
-                        <img src="/static/logo.svg" alt="" width="32" height="32" class="h-8 w-8">
+                        <img src="{{ url_path('static', path='logo.svg') }}" alt="" width="32" height="32"
+                            class="h-8 w-8">
                         <span class="text-lg font-semibold tracking-tight text-white">vcpkg-harbor</span>
                     </a>
                     <ul class="hidden items-center gap-1 md:flex">
                         {% for item in nav_items %}
-                        {% set is_active = request.url.path == item.href if item.exact else
-                        request.url.path.startswith(item.href) %}
                         <li>
-                            <a href="{{ item.href }}" class="nav-link {% if is_active %}nav-link-active{% endif %}" {% if
-                                is_active %}aria-current="page" {% endif %}>{{ item.label }}</a>
+                            <a href="{{ item.href }}" class="nav-link {% if item.active %}nav-link-active{% endif %}" {%
+                                if item.active %}aria-current="page" {% endif %}>{{ item.label }}</a>
                         </li>
                         {% endfor %}
                     </ul>
@@ -176,8 +124,8 @@
             class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-6 text-sm text-slate-500 sm:flex-row sm:px-6 lg:px-8">
             <p>Binary cache server for vcpkg</p>
             <ul class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-                <li><a class="footer-link" href="/health/details">Health</a></li>
-                <li><a class="footer-link" href="/api/docs">API reference</a></li>
+                <li><a class="footer-link" href="{{ health_url }}">Health</a></li>
+                <li><a class="footer-link" href="{{ api_docs_url }}">API reference</a></li>
                 <li>
                     <a class="footer-link" href="https://vcpkg-harbor.docs.renner.dev/" target="_blank"
                         rel="noopener noreferrer">Documentation</a>
@@ -190,8 +138,9 @@
         </div>
     </footer>
 
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="/static/js/app.js" defer></script>
+    {# HTMX: vendored by default, from the CDN when dashboard.assets = "cdn". #}
+    <script src="{{ assets.htmx_js }}"></script>
+    <script src="{{ url_path('static', path='js/app.js') }}" defer></script>
     {% block scripts %}{% endblock %}
 </body>
 

@@ -78,7 +78,7 @@
                 <tbody class="divide-y divide-slate-100">
                     {% for pkg in largest_packages %}
                     <tr class="row">
-                        <td class="td"><a href="/packages/{{ pkg.name }}" class="link">{{ pkg.name }}</a></td>
+                        <td class="td"><a href="{{ url_path('package_detail', name=pkg.name) }}" class="link">{{ pkg.name }}</a></td>
                         <td class="td font-mono text-xs">{{ pkg.version }}</td>
                         <td class="td font-mono text-xs">{{ pkg.triplet }}</td>
                         <td class="td-num">{{ pkg.size|filesize }}</td>

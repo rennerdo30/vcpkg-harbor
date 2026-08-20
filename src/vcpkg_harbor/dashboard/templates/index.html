@@ -12,10 +12,13 @@
 {% endblock %}
 
 {% block content %}
-{% set binary_source = 'clear;http,http://' ~ request.headers.get('host', 'localhost:15151') ~ '/{name}/{version}/{sha}/{triplet},readwrite' %}
+{# `cache_base_url` is absolute and already carries the proxy prefix, so the
+   snippet stays correct when the server is mounted under a sub-path. #}
+{% set binary_source = 'clear;http,' ~ cache_base_url ~ '/{name}/{version}/{sha}/{triplet},readwrite' %}
 <div class="space-y-6">
     <!-- Stats overview -->
-    <div id="stats-summary" hx-get="/partials/stats-summary" hx-trigger="every 30s" hx-swap="innerHTML">
+    <div id="stats-summary" hx-get="{{ url_path('stats_summary_partial') }}" hx-trigger="every 30s"
+        hx-swap="innerHTML">
         {% include "partials/stats_summary.html" %}
     </div>
 
@@ -28,8 +31,8 @@
                     <span class="spinner" aria-hidden="true"></span> Updating…
                 </span>
             </div>
-            <div id="recent-packages" hx-get="/partials/recent-packages" hx-trigger="every 30s" hx-swap="innerHTML"
-                aria-live="polite">
+            <div id="recent-packages" hx-get="{{ url_path('recent_packages_partial') }}" hx-trigger="every 30s"
+                hx-swap="innerHTML" aria-live="polite">
                 {% include "partials/recent_packages.html" %}
             </div>
         </section>

@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from vcpkg_harbor.dashboard.filters import register_filters
+from vcpkg_harbor.dashboard.urls import register_url_helpers, template_context
 
 if TYPE_CHECKING:
     from vcpkg_harbor.services.package_service import PackageService
@@ -18,10 +19,13 @@ logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["dashboard"])
 
-# Set up templates
+# Set up templates. The shared context processor and the url_path global keep the
+# templates free of root-absolute URLs, so the dashboard also works when it is
+# served under a prefix or embedded in an iframe.
 TEMPLATE_DIR = Path(__file__).parent / "templates"
-templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+templates = Jinja2Templates(directory=str(TEMPLATE_DIR), context_processors=[template_context])
 register_filters(templates.env)
+register_url_helpers(templates.env)
 
 # Listing sizes used by the dashboard pages.
 PACKAGES_PER_PAGE = 20
