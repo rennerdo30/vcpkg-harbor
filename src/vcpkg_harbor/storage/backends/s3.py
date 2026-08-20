@@ -15,6 +15,7 @@ from vcpkg_harbor.core.exceptions import (
     StorageError,
 )
 from vcpkg_harbor.storage.base import PackageInfo
+from vcpkg_harbor.storage.layout import object_key, parse_object_key
 
 logger = structlog.get_logger(__name__)
 
@@ -65,9 +66,16 @@ class S3Backend:
 
         return self._client
 
-    def _get_object_key(self, name: str, version: str, sha: str, triplet: str) -> str:
+    def _get_object_key(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> str:
         """Generate S3 object key from package details."""
-        return f"{name}/{version}/{sha}/{triplet}"
+        return object_key(name, version, sha, triplet, scope)
 
     async def initialize(self) -> None:
         """Initialize the S3 backend and ensure bucket exists."""
@@ -102,9 +110,16 @@ class S3Backend:
         logger.debug("Closing S3 backend")
         self._client = None
 
-    async def exists(self, name: str, version: str, sha: str, triplet: str) -> bool:
+    async def exists(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> bool:
         """Check if a package exists."""
-        key = self._get_object_key(name, version, sha, triplet)
+        key = self._get_object_key(name, version, sha, triplet, scope)
 
         try:
             loop = asyncio.get_event_loop()
@@ -118,9 +133,16 @@ class S3Backend:
                 return False
             raise StorageError(f"Error checking package existence: {e}", cause=e)
 
-    async def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
+    async def get(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> AsyncIterator[bytes]:
         """Get a package as an async iterator of bytes."""
-        key = self._get_object_key(name, version, sha, triplet)
+        key = self._get_object_key(name, version, sha, triplet, scope)
         logger.debug("Getting package", key=key)
 
         try:
@@ -157,12 +179,13 @@ class S3Backend:
         triplet: str,
         data: AsyncIterator[bytes],
         size: int | None = None,
+        scope: str | None = None,
     ) -> PackageInfo:
         """Store a package."""
-        key = self._get_object_key(name, version, sha, triplet)
+        key = self._get_object_key(name, version, sha, triplet, scope)
         logger.debug("Putting package", key=key)
 
-        if await self.exists(name, version, sha, triplet):
+        if await self.exists(name, version, sha, triplet, scope):
             logger.warning("Package already exists", key=key)
             raise PackageAlreadyExistsError(name, version, sha, triplet)
 
@@ -202,12 +225,19 @@ class S3Backend:
             logger.error("Error uploading package", key=key, error=str(e))
             raise StorageError(f"Error uploading package: {e}", cause=e)
 
-    async def delete(self, name: str, version: str, sha: str, triplet: str) -> bool:
+    async def delete(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> bool:
         """Delete a package."""
-        key = self._get_object_key(name, version, sha, triplet)
+        key = self._get_object_key(name, version, sha, triplet, scope)
         logger.debug("Deleting package", key=key)
 
-        if not await self.exists(name, version, sha, triplet):
+        if not await self.exists(name, version, sha, triplet, scope):
             return False
 
         try:
@@ -222,9 +252,16 @@ class S3Backend:
             logger.error("Error deleting package", key=key, error=str(e))
             raise StorageError(f"Error deleting package: {e}", cause=e)
 
-    async def stat(self, name: str, version: str, sha: str, triplet: str) -> PackageInfo:
+    async def stat(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> PackageInfo:
         """Get package information."""
-        key = self._get_object_key(name, version, sha, triplet)
+        key = self._get_object_key(name, version, sha, triplet, scope)
 
         try:
             loop = asyncio.get_event_loop()
@@ -270,23 +307,27 @@ class S3Backend:
 
             for page in paginator.paginate(**kwargs):
                 for obj in page.get("Contents", []):
+                    parsed = parse_object_key(obj["Key"])
+                    if parsed is None:
+                        # Bookkeeping documents are not packages.
+                        continue
+
                     count += 1
                     if count <= offset:
                         continue
 
-                    parts = obj["Key"].split("/")
-                    if len(parts) >= 4:
-                        packages.append(
-                            PackageInfo(
-                                name=parts[0],
-                                version=parts[1],
-                                sha=parts[2],
-                                triplet=parts[3],
-                                size=obj["Size"],
-                                etag=obj.get("ETag", "").strip('"'),
-                                created_at=obj.get("LastModified"),
-                            )
+                    packages.append(
+                        PackageInfo(
+                            name=parsed.key.name,
+                            version=parsed.key.version,
+                            sha=parsed.key.sha,
+                            triplet=parsed.key.triplet,
+                            size=obj["Size"],
+                            etag=obj.get("ETag", "").strip('"'),
+                            created_at=obj.get("LastModified"),
+                            tag=parsed.tag,
                         )
+                    )
 
                     if limit and len(packages) >= limit:
                         return packages
@@ -296,6 +337,85 @@ class S3Backend:
         except Exception as e:
             logger.error("Error listing packages", error=str(e))
             raise StorageError(f"Error listing packages: {e}", cause=e)
+
+    async def put_metadata(self, key: str, data: bytes) -> None:
+        """Store a bookkeeping document."""
+        logger.debug("Writing metadata", key=key, size=len(data))
+
+        try:
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                lambda: self.client.put_object(
+                    Bucket=self.bucket,
+                    Key=key,
+                    Body=BytesIO(data),
+                    ContentType="application/json",
+                ),
+            )
+        except Exception as e:
+            logger.error("Error writing metadata", key=key, error=str(e))
+            raise StorageError(f"Error writing metadata: {e}", cause=e)
+
+    async def get_metadata(self, key: str) -> bytes | None:
+        """Read a bookkeeping document."""
+        try:
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: self.client.get_object(Bucket=self.bucket, Key=key),
+            )
+            body = response["Body"]
+            try:
+                return bytes(await loop.run_in_executor(None, body.read))
+            finally:
+                body.close()
+        except Exception as e:
+            if "NoSuchKey" in str(e) or "404" in str(e):
+                return None
+            logger.error("Error reading metadata", key=key, error=str(e))
+            raise StorageError(f"Error reading metadata: {e}", cause=e)
+
+    async def delete_metadata(self, key: str) -> bool:
+        """Delete a bookkeeping document."""
+        loop = asyncio.get_event_loop()
+
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: self.client.head_object(Bucket=self.bucket, Key=key),
+            )
+        except Exception as e:
+            if "404" in str(e) or "NoSuchKey" in str(e):
+                return False
+            raise StorageError(f"Error deleting metadata: {e}", cause=e)
+
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: self.client.delete_object(Bucket=self.bucket, Key=key),
+            )
+            return True
+        except Exception as e:
+            logger.error("Error deleting metadata", key=key, error=str(e))
+            raise StorageError(f"Error deleting metadata: {e}", cause=e)
+
+    async def list_metadata(self, prefix: str) -> list[str]:
+        """List bookkeeping document keys under a prefix."""
+        try:
+            loop = asyncio.get_event_loop()
+
+            def _list() -> list[str]:
+                paginator = self.client.get_paginator("list_objects_v2")
+                keys: list[str] = []
+                for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
+                    keys.extend(obj["Key"] for obj in page.get("Contents", []))
+                return keys
+
+            return sorted(await loop.run_in_executor(None, _list))
+        except Exception as e:
+            logger.error("Error listing metadata", prefix=prefix, error=str(e))
+            raise StorageError(f"Error listing metadata: {e}", cause=e)
 
     async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""

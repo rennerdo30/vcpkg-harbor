@@ -14,6 +14,7 @@ from vcpkg_harbor.core.exceptions import (
     StorageError,
 )
 from vcpkg_harbor.storage.base import PackageInfo
+from vcpkg_harbor.storage.layout import object_key, parse_object_key
 
 logger = structlog.get_logger(__name__)
 
@@ -59,9 +60,16 @@ class GCSBackend:
 
         return self._bucket
 
-    def _get_blob_name(self, name: str, version: str, sha: str, triplet: str) -> str:
+    def _get_blob_name(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> str:
         """Generate blob name from package details."""
-        return f"{name}/{version}/{sha}/{triplet}"
+        return object_key(name, version, sha, triplet, scope)
 
     async def initialize(self) -> None:
         """Initialize the GCS backend and ensure bucket exists."""
@@ -92,9 +100,16 @@ class GCSBackend:
         self._client = None
         self._bucket = None
 
-    async def exists(self, name: str, version: str, sha: str, triplet: str) -> bool:
+    async def exists(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> bool:
         """Check if a package exists."""
-        blob_name = self._get_blob_name(name, version, sha, triplet)
+        blob_name = self._get_blob_name(name, version, sha, triplet, scope)
 
         try:
             loop = asyncio.get_event_loop()
@@ -103,12 +118,19 @@ class GCSBackend:
         except Exception as e:
             raise StorageError(f"Error checking package existence: {e}", cause=e)
 
-    async def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
+    async def get(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> AsyncIterator[bytes]:
         """Get a package as an async iterator of bytes."""
-        blob_name = self._get_blob_name(name, version, sha, triplet)
+        blob_name = self._get_blob_name(name, version, sha, triplet, scope)
         logger.debug("Getting package", blob=blob_name)
 
-        if not await self.exists(name, version, sha, triplet):
+        if not await self.exists(name, version, sha, triplet, scope):
             logger.warning("Package not found", blob=blob_name)
             raise PackageNotFoundError(name, version, sha, triplet)
 
@@ -136,12 +158,13 @@ class GCSBackend:
         triplet: str,
         data: AsyncIterator[bytes],
         size: int | None = None,
+        scope: str | None = None,
     ) -> PackageInfo:
         """Store a package."""
-        blob_name = self._get_blob_name(name, version, sha, triplet)
+        blob_name = self._get_blob_name(name, version, sha, triplet, scope)
         logger.debug("Putting package", blob=blob_name)
 
-        if await self.exists(name, version, sha, triplet):
+        if await self.exists(name, version, sha, triplet, scope):
             logger.warning("Package already exists", blob=blob_name)
             raise PackageAlreadyExistsError(name, version, sha, triplet)
 
@@ -180,12 +203,19 @@ class GCSBackend:
             logger.error("Error uploading package", blob=blob_name, error=str(e))
             raise StorageError(f"Error uploading package: {e}", cause=e)
 
-    async def delete(self, name: str, version: str, sha: str, triplet: str) -> bool:
+    async def delete(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> bool:
         """Delete a package."""
-        blob_name = self._get_blob_name(name, version, sha, triplet)
+        blob_name = self._get_blob_name(name, version, sha, triplet, scope)
         logger.debug("Deleting package", blob=blob_name)
 
-        if not await self.exists(name, version, sha, triplet):
+        if not await self.exists(name, version, sha, triplet, scope):
             return False
 
         try:
@@ -198,11 +228,18 @@ class GCSBackend:
             logger.error("Error deleting package", blob=blob_name, error=str(e))
             raise StorageError(f"Error deleting package: {e}", cause=e)
 
-    async def stat(self, name: str, version: str, sha: str, triplet: str) -> PackageInfo:
+    async def stat(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> PackageInfo:
         """Get package information."""
-        blob_name = self._get_blob_name(name, version, sha, triplet)
+        blob_name = self._get_blob_name(name, version, sha, triplet, scope)
 
-        if not await self.exists(name, version, sha, triplet):
+        if not await self.exists(name, version, sha, triplet, scope):
             raise PackageNotFoundError(name, version, sha, triplet)
 
         try:
@@ -243,23 +280,29 @@ class GCSBackend:
             )
 
             packages = []
-            for i, blob in enumerate(blobs):
-                if i < offset:
+            count = 0
+            for blob in blobs:
+                parsed = parse_object_key(blob.name)
+                if parsed is None:
+                    # Bookkeeping documents are not packages.
                     continue
 
-                parts = blob.name.split("/")
-                if len(parts) >= 4:
-                    packages.append(
-                        PackageInfo(
-                            name=parts[0],
-                            version=parts[1],
-                            sha=parts[2],
-                            triplet=parts[3],
-                            size=blob.size or 0,
-                            etag=blob.etag,
-                            created_at=blob.time_created,
-                        )
+                count += 1
+                if count <= offset:
+                    continue
+
+                packages.append(
+                    PackageInfo(
+                        name=parsed.key.name,
+                        version=parsed.key.version,
+                        sha=parsed.key.sha,
+                        triplet=parsed.key.triplet,
+                        size=blob.size or 0,
+                        etag=blob.etag,
+                        created_at=blob.time_created,
+                        tag=parsed.tag,
                     )
+                )
 
                 if limit and len(packages) >= limit:
                     break
@@ -269,6 +312,61 @@ class GCSBackend:
         except Exception as e:
             logger.error("Error listing packages", error=str(e))
             raise StorageError(f"Error listing packages: {e}", cause=e)
+
+    async def put_metadata(self, key: str, data: bytes) -> None:
+        """Store a bookkeeping document."""
+        logger.debug("Writing metadata", key=key, size=len(data))
+
+        try:
+            loop = asyncio.get_event_loop()
+            blob = self.bucket.blob(key)
+            await loop.run_in_executor(
+                None,
+                lambda: blob.upload_from_string(data, content_type="application/json"),
+            )
+        except Exception as e:
+            logger.error("Error writing metadata", key=key, error=str(e))
+            raise StorageError(f"Error writing metadata: {e}", cause=e)
+
+    async def get_metadata(self, key: str) -> bytes | None:
+        """Read a bookkeeping document."""
+        try:
+            loop = asyncio.get_event_loop()
+            blob = self.bucket.blob(key)
+            if not await loop.run_in_executor(None, blob.exists):
+                return None
+            return bytes(await loop.run_in_executor(None, blob.download_as_bytes))
+        except Exception as e:
+            logger.error("Error reading metadata", key=key, error=str(e))
+            raise StorageError(f"Error reading metadata: {e}", cause=e)
+
+    async def delete_metadata(self, key: str) -> bool:
+        """Delete a bookkeeping document."""
+        try:
+            loop = asyncio.get_event_loop()
+            blob = self.bucket.blob(key)
+            if not await loop.run_in_executor(None, blob.exists):
+                return False
+            await loop.run_in_executor(None, blob.delete)
+            return True
+        except Exception as e:
+            logger.error("Error deleting metadata", key=key, error=str(e))
+            raise StorageError(f"Error deleting metadata: {e}", cause=e)
+
+    async def list_metadata(self, prefix: str) -> list[str]:
+        """List bookkeeping document keys under a prefix."""
+        try:
+            # Touch the bucket property so that the lazy client exists.
+            _ = self.bucket
+            loop = asyncio.get_event_loop()
+            blobs = await loop.run_in_executor(
+                None,
+                lambda: list(cast(Any, self._client).list_blobs(self.bucket_name, prefix=prefix)),
+            )
+            return sorted(blob.name for blob in blobs)
+        except Exception as e:
+            logger.error("Error listing metadata", prefix=prefix, error=str(e))
+            raise StorageError(f"Error listing metadata: {e}", cause=e)
 
     async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""
