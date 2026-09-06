@@ -37,6 +37,7 @@ export default defineConfig({
           label: "User Guide",
           items: [
             { label: "Storage Backends", slug: "user-guide/storage-backends" },
+            { label: "Build Tags", slug: "user-guide/build-tags" },
             { label: "Authentication", slug: "user-guide/authentication" },
             { label: "Dashboard", slug: "user-guide/dashboard" },
             { label: "Metrics", slug: "user-guide/metrics" },

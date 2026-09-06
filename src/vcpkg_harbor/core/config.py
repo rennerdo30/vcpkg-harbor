@@ -1,15 +1,29 @@
 """Configuration management for vcpkg-harbor using Pydantic Settings."""
 
+import re
 from functools import lru_cache
 from typing import Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from vcpkg_harbor.core.paths import PATH_SEPARATOR, normalize_prefix
 
 #: Accepted values for the X-Frame-Options header.
 FRAME_OPTIONS_VALUES: frozenset[str] = frozenset({"DENY", "SAMEORIGIN"})
+
+# Default pattern for build tag names: a conservative, URL and object-store safe
+# subset that cannot contain path separators or start with harbor's reserved
+# underscore prefix.
+DEFAULT_TAG_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+
+# Name of the namespace that untagged (4 segment) requests belong to. The
+# leading underscore keeps it unreachable through DEFAULT_TAG_PATTERN, so a
+# client cannot address the untagged namespace as if it were a tag.
+DEFAULT_NAMESPACE = "_default"
+
+# Sentinel for "no limit" on the per-tag retention settings.
+UNLIMITED = 0
 
 
 class ServerSettings(BaseSettings):
@@ -23,7 +37,7 @@ class ServerSettings(BaseSettings):
 
     host: str = Field(default="0.0.0.0", description="Host to bind the server to")
     port: int = Field(default=15151, description="Port to bind the server to")
-    workers: int = Field(default=4, description="Number of worker processes")
+    workers: int = Field(default=1, ge=1, description="Number of worker processes")
     reload: bool = Field(default=False, description="Enable auto-reload for development")
     read_only: bool = Field(default=False, description="Run server in read-only mode")
     write_only: bool = Field(default=False, description="Run server in write-only mode")
@@ -179,6 +193,84 @@ class GCSSettings(BaseSettings):
     credentials_file: str | None = Field(default=None, description="Path to service account JSON")
 
 
+class TagSettings(BaseSettings):
+    """Build tag configuration settings.
+
+    Build tags let independent build streams (nightly, release, per-PR CI, ...)
+    share one server while keeping separate views of the cache. A tag is an
+    optional first path segment, so it only needs to be appended to the base URL
+    configured in ``VCPKG_BINARY_SOURCES`` -- no vcpkg client change is needed.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="VCPKG_TAGS_",
+        env_file=".env",
+        extra="ignore",
+    )
+
+    enabled: bool = Field(
+        default=True,
+        description="Accept an optional build tag as the first path segment",
+    )
+    allowed: str | None = Field(
+        default=None,
+        description=(
+            "Comma-separated allowlist of tag names. Empty means any tag matching "
+            "the tag pattern is accepted."
+        ),
+    )
+    pattern: str = Field(
+        default=DEFAULT_TAG_PATTERN,
+        description="Regular expression every tag name must match",
+    )
+    default_namespace: str = Field(
+        default=DEFAULT_NAMESPACE,
+        description="Namespace name used for untagged (4 segment) requests",
+    )
+    dedupe: bool = Field(
+        default=True,
+        description=(
+            "Store each package once and let tags reference it with reference "
+            "counting. When disabled, every tag keeps a private copy."
+        ),
+    )
+    max_packages_per_tag: int = Field(
+        default=UNLIMITED,
+        ge=0,
+        description="Maximum number of packages kept per tag (0 = unlimited)",
+    )
+    max_bytes_per_tag: int = Field(
+        default=UNLIMITED,
+        ge=0,
+        description="Maximum total package size kept per tag in bytes (0 = unlimited)",
+    )
+
+    @field_validator("pattern")
+    @classmethod
+    def validate_pattern(cls, v: str) -> str:
+        """Validate that the tag pattern compiles."""
+        try:
+            re.compile(v)
+        except re.error as exc:
+            raise ValueError(f"Invalid tag pattern {v!r}: {exc}")
+        return v
+
+    @field_validator("default_namespace")
+    @classmethod
+    def validate_default_namespace(cls, v: str) -> str:
+        """Validate that the default namespace is a usable single key segment."""
+        if not v or "/" in v or "\\" in v or v in {".", ".."}:
+            raise ValueError(f"Invalid default namespace: {v!r}")
+        return v
+
+    @property
+    def allowlist(self) -> frozenset[str]:
+        """The configured tag allowlist, empty when any valid tag is accepted."""
+        if not self.allowed:
+            return frozenset()
+        return frozenset(part.strip() for part in self.allowed.split(",") if part.strip())
+
+
 class LoggingSettings(BaseSettings):
     """Logging configuration settings."""
 
@@ -271,6 +363,7 @@ class Settings(BaseSettings):
     server: ServerSettings = Field(default_factory=ServerSettings)
     proxy: ProxySettings = Field(default_factory=ProxySettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
+    tags: TagSettings = Field(default_factory=TagSettings)
     minio: MinioSettings = Field(default_factory=MinioSettings)
     s3: S3Settings = Field(default_factory=S3Settings)
     azure: AzureSettings = Field(default_factory=AzureSettings)
@@ -279,6 +372,13 @@ class Settings(BaseSettings):
     auth: AuthSettings = Field(default_factory=AuthSettings)
     metrics: MetricsSettings = Field(default_factory=MetricsSettings)
     dashboard: DashboardSettings = Field(default_factory=DashboardSettings)
+
+    @model_validator(mode="after")
+    def validate_tag_workers(self) -> "Settings":
+        """The tag index requires a single writer process."""
+        if self.tags.enabled and self.server.workers != 1:
+            raise ValueError("Build tags require VCPKG_SERVER_WORKERS=1")
+        return self
 
     def get_storage_config(self) -> dict[str, Any]:
         """Get the configuration for the active storage backend."""

@@ -28,7 +28,7 @@ from vcpkg_harbor.core.paths import (
     STATIC_URL_PATH,
 )
 from vcpkg_harbor.dashboard import router as dashboard_router
-from vcpkg_harbor.services import CacheService, PackageService, StatsService
+from vcpkg_harbor.services import CacheService, PackageService, StatsService, TagService
 from vcpkg_harbor.storage.registry import get_storage_backend
 
 logger = structlog.get_logger(__name__)
@@ -58,7 +58,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
 
     # Initialize services
-    app.state.cache_service = CacheService(storage, settings)
+    tag_service = TagService(storage, settings)
+    app.state.tag_service = tag_service
+    app.state.cache_service = CacheService(storage, settings, tag_service)
     app.state.stats_service = StatsService(storage)
     app.state.package_service = PackageService(storage)
 
@@ -67,6 +69,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Server running in READ-ONLY mode")
     if settings.server.write_only:
         logger.info("Server running in WRITE-ONLY mode")
+    if settings.tags.enabled:
+        logger.info(
+            "Build tags enabled",
+            default_namespace=settings.tags.default_namespace,
+            dedupe=settings.tags.dedupe,
+            allowlist=sorted(settings.tags.allowlist) or None,
+            max_packages_per_tag=settings.tags.max_packages_per_tag or None,
+            max_bytes_per_tag=settings.tags.max_bytes_per_tag or None,
+        )
+    else:
+        logger.info("Build tags disabled")
 
     yield
 
@@ -149,15 +162,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings.proxy.root_path:
         app.add_middleware(RootPathMiddleware, root_path=settings.proxy.root_path)
 
-    # Mount static files
-    static_dir = Path(__file__).parent / "static"
-    if static_dir.exists():
-        app.mount(
-            STATIC_URL_PATH,
-            StaticFiles(directory=str(static_dir)),
-            name=STATIC_ROUTE_NAME,
-        )
-
     # Include routers
     app.include_router(health_router)
 
@@ -166,6 +170,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Cache API routes (vcpkg protocol)
     app.include_router(cache_router)
+
+    # Mount static files
+    static_dir = Path(__file__).parent / "static"
+    if static_dir.exists():
+        app.mount(STATIC_URL_PATH, StaticFiles(directory=str(static_dir)), name=STATIC_ROUTE_NAME)
 
     # Dashboard routes
     if settings.dashboard.enabled:

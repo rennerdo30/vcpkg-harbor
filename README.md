@@ -37,13 +37,14 @@ the backend of your choice, and shows you what is in the cache.
 
 ## Features
 
-- 🚀 **Multiple storage backends** - MinIO, AWS S3, Azure Blob, Google Cloud Storage, or the local filesystem
-- 🔌 **Plugin architecture** - add your own backend through the `vcpkg_harbor.storage` entry point
-- 📊 **Web dashboard** - browse cached packages and watch cache statistics live
-- 📈 **Prometheus metrics** - `/metrics` endpoint for monitoring and alerting
-- 🔐 **Optional authentication** - static token or HTTP Basic
-- ⚡ **Async and streaming** - FastAPI with streaming uploads and downloads
-- 🐳 **Container images** - published to GitHub Container Registry, plus Compose files
+- 🚀 **Multiple Storage Backends** - MinIO, AWS S3, Azure Blob, Google Cloud Storage, or local filesystem
+- 🏷️ **Build Tags** - Nightly, release and per-PR streams share one server with isolated views, deduplicated storage and reference counting
+- 🔌 **Plugin Architecture** - Easy to add custom storage backends via entry points
+- 📊 **Web Dashboard** - Monitor cache statistics and browse packages in real-time
+- 📈 **Prometheus Metrics** - Built-in metrics endpoint for monitoring and alerting
+- 🔐 **Authentication** - Token and HTTP Basic authentication support
+- ⚡ **High Performance** - Async Python with streaming uploads/downloads
+- 🐳 **Docker Ready** - Production-ready Docker images and compose files
 
 ## Quick start
 
@@ -165,17 +166,43 @@ VCPKG_PROXY_ROOT_PATH=/harbor
 VCPKG_PROXY_FORWARDED_ALLOW_IPS=10.0.0.1
 # Restrict who may embed the dashboard; unset means anyone may
 VCPKG_PROXY_FRAME_ANCESTORS="'self' https://portal.example.com"
+
+# Build tags (optional)
+VCPKG_TAGS_ENABLED=true          # accept /{tag}/... paths
+VCPKG_TAGS_ALLOWED=nightly,release,ci   # only these tag names (default: any valid name)
+VCPKG_TAGS_DEDUPE=true           # store each package once, reference count it across tags
+VCPKG_TAGS_MAX_PACKAGES_PER_TAG=0       # per-tag retention limit (0 = unlimited)
 ```
 
-## API endpoints
+See the [configuration reference](https://vcpkg-harbor.docs.renner.dev/getting-started/configuration/)
+for every variable.
+
+## Build Tags
+
+Independent build streams can share one server while keeping separate views of
+the cache. The tag is just a leading path segment, so only the base URL changes -
+no vcpkg client changes are needed:
+
+```bash
+export VCPKG_BINARY_SOURCES="clear;http,http://localhost:15151/nightly/{name}/{version}/{sha}/{triplet},readwrite"
+```
+
+Tags are isolated (a `nightly` package is not served to `release`), yet each
+package is stored only once and reference counted, so deleting it from one tag
+leaves the others working. Untagged requests keep the previous behaviour and
+storage layout, so existing caches keep working without migration. See the
+[build tags guide](https://vcpkg-harbor.docs.renner.dev/user-guide/build-tags/).
+
+## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/{name}/{version}/{sha}/{triplet}` | HEAD | Check whether a binary is cached |
-| `/{name}/{version}/{sha}/{triplet}` | GET | Download a cached binary |
-| `/{name}/{version}/{sha}/{triplet}` | PUT | Upload a binary |
-| `/health` | GET | Liveness check |
-| `/health/details` | GET | Health check including the storage backend |
+| `/{name}/{version}/{sha}/{triplet}` | HEAD | Check if package exists |
+| `/{name}/{version}/{sha}/{triplet}` | GET | Download package |
+| `/{name}/{version}/{sha}/{triplet}` | PUT | Upload package |
+| `/{name}/{version}/{sha}/{triplet}` | DELETE | Delete package |
+| `/{tag}/{name}/{version}/{sha}/{triplet}` | HEAD, GET, PUT, DELETE | Same operations, scoped to a build tag |
+| `/health` | GET | Health check |
 | `/metrics` | GET | Prometheus metrics |
 | `/api/docs` | GET | OpenAPI reference (Swagger UI) |
 | `/`, `/packages`, `/stats` | GET | Web dashboard |
@@ -214,12 +241,12 @@ embedding page still leaves a working dashboard.
 📚 **[Full documentation](https://vcpkg-harbor.docs.renner.dev/)**
 
 - [Installation](https://vcpkg-harbor.docs.renner.dev/getting-started/installation/)
-- [Quick start](https://vcpkg-harbor.docs.renner.dev/getting-started/quickstart/)
+- [Quick Start](https://vcpkg-harbor.docs.renner.dev/getting-started/quickstart/)
 - [Configuration](https://vcpkg-harbor.docs.renner.dev/getting-started/configuration/)
-- [Storage backends](https://vcpkg-harbor.docs.renner.dev/user-guide/storage-backends/)
-- [Dashboard](https://vcpkg-harbor.docs.renner.dev/user-guide/dashboard/)
-- [Docker deployment](https://vcpkg-harbor.docs.renner.dev/deployment/docker/)
-- [Kubernetes deployment](https://vcpkg-harbor.docs.renner.dev/deployment/kubernetes/)
+- [Storage Backends](https://vcpkg-harbor.docs.renner.dev/user-guide/storage-backends/)
+- [Build Tags](https://vcpkg-harbor.docs.renner.dev/user-guide/build-tags/)
+- [Docker Deployment](https://vcpkg-harbor.docs.renner.dev/deployment/docker/)
+- [Kubernetes Deployment](https://vcpkg-harbor.docs.renner.dev/deployment/kubernetes/)
 
 ## Development
 

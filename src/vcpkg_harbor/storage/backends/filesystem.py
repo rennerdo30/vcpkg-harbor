@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import aiofiles
 import aiofiles.os
@@ -17,8 +18,12 @@ from vcpkg_harbor.core.exceptions import (
     StorageError,
 )
 from vcpkg_harbor.storage.base import PackageInfo
+from vcpkg_harbor.storage.layout import object_key, parse_object_key
 
 logger = structlog.get_logger(__name__)
+
+# Size of the chunks used for streaming reads and hashing.
+CHUNK_SIZE = 64 * 1024
 
 
 class FilesystemBackend:
@@ -32,9 +37,33 @@ class FilesystemBackend:
         """
         self.base_path = Path(path).resolve()
 
-    def _get_package_path(self, name: str, version: str, sha: str, triplet: str) -> Path:
+    def _resolve(self, key: str) -> Path:
+        """Resolve a storage key to an absolute path inside the base path.
+
+        Args:
+            key: Storage key using ``/`` separators
+
+        Returns:
+            The absolute path for the key
+
+        Raises:
+            StorageError: If the key would escape the storage root
+        """
+        candidate = (self.base_path / key).resolve()
+        if candidate != self.base_path and self.base_path not in candidate.parents:
+            raise StorageError(f"Storage key escapes the storage root: {key}")
+        return candidate
+
+    def _get_package_path(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> Path:
         """Get the full path for a package."""
-        return self.base_path / name / version / sha / triplet
+        return self._resolve(object_key(name, version, sha, triplet, scope))
 
     async def initialize(self) -> None:
         """Initialize the filesystem backend."""
@@ -51,14 +80,28 @@ class FilesystemBackend:
         """Close the filesystem backend (no-op for filesystem)."""
         logger.debug("Closing filesystem backend")
 
-    async def exists(self, name: str, version: str, sha: str, triplet: str) -> bool:
+    async def exists(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> bool:
         """Check if a package exists."""
-        package_path = self._get_package_path(name, version, sha, triplet)
+        package_path = self._get_package_path(name, version, sha, triplet, scope)
         return package_path.exists()
 
-    async def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
+    async def get(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> AsyncIterator[bytes]:
         """Get a package as an async iterator of bytes."""
-        package_path = self._get_package_path(name, version, sha, triplet)
+        package_path = self._get_package_path(name, version, sha, triplet, scope)
         logger.debug("Getting package", path=str(package_path))
 
         if not package_path.exists():
@@ -67,9 +110,8 @@ class FilesystemBackend:
 
         try:
             async with aiofiles.open(package_path, "rb") as f:
-                chunk_size = 64 * 1024  # 64KB chunks
                 while True:
-                    chunk = await f.read(chunk_size)
+                    chunk = await f.read(CHUNK_SIZE)
                     if not chunk:
                         break
                     yield chunk
@@ -85,9 +127,10 @@ class FilesystemBackend:
         triplet: str,
         data: AsyncIterator[bytes],
         size: int | None = None,
+        scope: str | None = None,
     ) -> PackageInfo:
         """Store a package."""
-        package_path = self._get_package_path(name, version, sha, triplet)
+        package_path = self._get_package_path(name, version, sha, triplet, scope)
         logger.debug("Putting package", path=str(package_path))
 
         # Check if already exists
@@ -131,9 +174,16 @@ class FilesystemBackend:
             logger.error("Error uploading package", path=str(package_path), error=str(e))
             raise StorageError(f"Error uploading package: {e}", cause=e)
 
-    async def delete(self, name: str, version: str, sha: str, triplet: str) -> bool:
+    async def delete(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> bool:
         """Delete a package."""
-        package_path = self._get_package_path(name, version, sha, triplet)
+        package_path = self._get_package_path(name, version, sha, triplet, scope)
         logger.debug("Deleting package", path=str(package_path))
 
         if not package_path.exists():
@@ -162,9 +212,16 @@ class FilesystemBackend:
         except Exception:
             pass  # Ignore cleanup errors
 
-    async def stat(self, name: str, version: str, sha: str, triplet: str) -> PackageInfo:
+    async def stat(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> PackageInfo:
         """Get package information."""
-        package_path = self._get_package_path(name, version, sha, triplet)
+        package_path = self._get_package_path(name, version, sha, triplet, scope)
 
         if not package_path.exists():
             raise PackageNotFoundError(name, version, sha, triplet)
@@ -175,7 +232,7 @@ class FilesystemBackend:
             # Calculate MD5 for etag
             hasher = hashlib.md5()
             async with aiofiles.open(package_path, "rb") as f:
-                while chunk := await f.read(64 * 1024):
+                while chunk := await f.read(CHUNK_SIZE):
                     hasher.update(chunk)
 
             return PackageInfo(
@@ -202,55 +259,118 @@ class FilesystemBackend:
         """List packages in storage."""
         logger.debug("Listing packages", prefix=prefix, limit=limit, offset=offset)
 
-        packages = []
+        packages: list[PackageInfo] = []
         count = 0
 
         try:
-            # Walk directory structure: base/name/version/sha/triplet
-            for name_dir in sorted(self.base_path.iterdir()):
-                if not name_dir.is_dir():
+            for path in sorted(self.base_path.rglob("*")):
+                if not path.is_file():
                     continue
 
-                # Apply prefix filter
-                if prefix and not name_dir.name.startswith(prefix.split("/")[0]):
+                key = path.relative_to(self.base_path).as_posix()
+                parsed = parse_object_key(key)
+                if parsed is None:
+                    # Bookkeeping documents and stray files are not packages.
                     continue
 
-                for version_dir in sorted(name_dir.iterdir()):
-                    if not version_dir.is_dir():
-                        continue
+                # Filter on the package identity so that both the shared copy
+                # and tag scoped copies are matched the same way.
+                if prefix and not parsed.key.path.startswith(prefix):
+                    continue
 
-                    for sha_dir in sorted(version_dir.iterdir()):
-                        if not sha_dir.is_dir():
-                            continue
+                count += 1
+                if count <= offset:
+                    continue
 
-                        for triplet_file in sorted(sha_dir.iterdir()):
-                            if not triplet_file.is_file():
-                                continue
+                stat = path.stat()
+                packages.append(
+                    PackageInfo(
+                        name=parsed.key.name,
+                        version=parsed.key.version,
+                        sha=parsed.key.sha,
+                        triplet=parsed.key.triplet,
+                        size=stat.st_size,
+                        created_at=datetime.fromtimestamp(stat.st_ctime),
+                        tag=parsed.tag,
+                    )
+                )
 
-                            count += 1
-                            if count <= offset:
-                                continue
-
-                            stat = triplet_file.stat()
-                            packages.append(
-                                PackageInfo(
-                                    name=name_dir.name,
-                                    version=version_dir.name,
-                                    sha=sha_dir.name,
-                                    triplet=triplet_file.name,
-                                    size=stat.st_size,
-                                    created_at=datetime.fromtimestamp(stat.st_ctime),
-                                )
-                            )
-
-                            if limit and len(packages) >= limit:
-                                return packages
+                if limit and len(packages) >= limit:
+                    return packages
 
             return packages
 
         except Exception as e:
             logger.error("Error listing packages", error=str(e))
             raise StorageError(f"Error listing packages: {e}", cause=e)
+
+    async def put_metadata(self, key: str, data: bytes) -> None:
+        """Store a bookkeeping document."""
+        path = self._resolve(key)
+        logger.debug("Writing metadata", path=str(path), size=len(data))
+
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            # Write to a temporary file and rename, so a reader never observes a
+            # partially written document.
+            tmp_path = path.with_name(f"{path.name}.{uuid4().hex}.tmp")
+            async with aiofiles.open(tmp_path, "wb") as f:
+                await f.write(data)
+            os.replace(tmp_path, path)
+        except Exception as e:
+            logger.error("Error writing metadata", path=str(path), error=str(e))
+            raise StorageError(f"Error writing metadata: {e}", cause=e)
+
+    async def get_metadata(self, key: str) -> bytes | None:
+        """Read a bookkeeping document."""
+        path = self._resolve(key)
+
+        try:
+            async with aiofiles.open(path, "rb") as f:
+                return await f.read()
+        except FileNotFoundError:
+            return None
+        except IsADirectoryError:
+            return None
+        except Exception as e:
+            logger.error("Error reading metadata", path=str(path), error=str(e))
+            raise StorageError(f"Error reading metadata: {e}", cause=e)
+
+    async def delete_metadata(self, key: str) -> bool:
+        """Delete a bookkeeping document."""
+        path = self._resolve(key)
+
+        try:
+            await aiofiles.os.remove(path)
+        except FileNotFoundError:
+            return False
+        except Exception as e:
+            logger.error("Error deleting metadata", path=str(path), error=str(e))
+            raise StorageError(f"Error deleting metadata: {e}", cause=e)
+
+        await self._cleanup_empty_dirs(path.parent)
+        return True
+
+    async def list_metadata(self, prefix: str) -> list[str]:
+        """List bookkeeping document keys under a prefix."""
+        root = self._resolve(prefix)
+        search_root = root if root.is_dir() else root.parent
+
+        if not search_root.exists():
+            return []
+
+        try:
+            keys = []
+            for path in search_root.rglob("*"):
+                if not path.is_file():
+                    continue
+                key = path.relative_to(self.base_path).as_posix()
+                if key.startswith(prefix):
+                    keys.append(key)
+            return sorted(keys)
+        except Exception as e:
+            logger.error("Error listing metadata", prefix=prefix, error=str(e))
+            raise StorageError(f"Error listing metadata: {e}", cause=e)
 
     async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""

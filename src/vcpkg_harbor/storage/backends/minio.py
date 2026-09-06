@@ -17,6 +17,7 @@ from vcpkg_harbor.core.exceptions import (
     StorageError,
 )
 from vcpkg_harbor.storage.base import PackageInfo
+from vcpkg_harbor.storage.layout import object_key, parse_object_key
 
 logger = structlog.get_logger(__name__)
 
@@ -64,9 +65,16 @@ class MinioBackend:
             )
         return self._client
 
-    def _get_object_path(self, name: str, version: str, sha: str, triplet: str) -> str:
+    def _get_object_path(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> str:
         """Generate object path from package details."""
-        return f"{name}/{version}/{sha}/{triplet}"
+        return object_key(name, version, sha, triplet, scope)
 
     async def initialize(self) -> None:
         """Initialize the MinIO backend and ensure bucket exists."""
@@ -92,9 +100,16 @@ class MinioBackend:
         logger.debug("Closing MinIO backend")
         self._client = None
 
-    async def exists(self, name: str, version: str, sha: str, triplet: str) -> bool:
+    async def exists(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> bool:
         """Check if a package exists."""
-        object_path = self._get_object_path(name, version, sha, triplet)
+        object_path = self._get_object_path(name, version, sha, triplet, scope)
 
         try:
             loop = asyncio.get_event_loop()
@@ -105,9 +120,16 @@ class MinioBackend:
                 return False
             raise StorageError(f"Error checking package existence: {e}", cause=e)
 
-    async def get(self, name: str, version: str, sha: str, triplet: str) -> AsyncIterator[bytes]:
+    async def get(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> AsyncIterator[bytes]:
         """Get a package as an async iterator of bytes."""
-        object_path = self._get_object_path(name, version, sha, triplet)
+        object_path = self._get_object_path(name, version, sha, triplet, scope)
         logger.debug("Getting package", path=object_path)
 
         try:
@@ -143,13 +165,14 @@ class MinioBackend:
         triplet: str,
         data: AsyncIterator[bytes],
         size: int | None = None,
+        scope: str | None = None,
     ) -> PackageInfo:
         """Store a package."""
-        object_path = self._get_object_path(name, version, sha, triplet)
+        object_path = self._get_object_path(name, version, sha, triplet, scope)
         logger.debug("Putting package", path=object_path)
 
         # Check if already exists
-        if await self.exists(name, version, sha, triplet):
+        if await self.exists(name, version, sha, triplet, scope):
             logger.warning("Package already exists", path=object_path)
             raise PackageAlreadyExistsError(name, version, sha, triplet)
 
@@ -191,12 +214,19 @@ class MinioBackend:
             logger.error("Error uploading package", path=object_path, error=str(e))
             raise StorageError(f"Error uploading package: {e}", cause=e)
 
-    async def delete(self, name: str, version: str, sha: str, triplet: str) -> bool:
+    async def delete(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> bool:
         """Delete a package."""
-        object_path = self._get_object_path(name, version, sha, triplet)
+        object_path = self._get_object_path(name, version, sha, triplet, scope)
         logger.debug("Deleting package", path=object_path)
 
-        if not await self.exists(name, version, sha, triplet):
+        if not await self.exists(name, version, sha, triplet, scope):
             return False
 
         try:
@@ -208,9 +238,16 @@ class MinioBackend:
             logger.error("Error deleting package", path=object_path, error=str(e))
             raise StorageError(f"Error deleting package: {e}", cause=e)
 
-    async def stat(self, name: str, version: str, sha: str, triplet: str) -> PackageInfo:
+    async def stat(
+        self,
+        name: str,
+        version: str,
+        sha: str,
+        triplet: str,
+        scope: str | None = None,
+    ) -> PackageInfo:
         """Get package information."""
-        object_path = self._get_object_path(name, version, sha, triplet)
+        object_path = self._get_object_path(name, version, sha, triplet, scope)
 
         try:
             loop = asyncio.get_event_loop()
@@ -251,32 +288,107 @@ class MinioBackend:
             )
 
             packages: list[PackageInfo] = []
-            for i, obj in enumerate(objects):
-                if i < offset:
+            count = 0
+            for obj in objects:
+                parsed = parse_object_key(obj.object_name)
+                if parsed is None:
+                    # Bookkeeping documents are not packages.
+                    continue
+
+                count += 1
+                if count <= offset:
                     continue
                 if limit and len(packages) >= limit:
                     break
 
-                # Parse object path (name/version/sha/triplet)
-                parts = obj.object_name.split("/")
-                if len(parts) >= 4:
-                    packages.append(
-                        PackageInfo(
-                            name=parts[0],
-                            version=parts[1],
-                            sha=parts[2],
-                            triplet=parts[3],
-                            size=obj.size,
-                            etag=obj.etag,
-                            created_at=obj.last_modified,
-                        )
+                packages.append(
+                    PackageInfo(
+                        name=parsed.key.name,
+                        version=parsed.key.version,
+                        sha=parsed.key.sha,
+                        triplet=parsed.key.triplet,
+                        size=obj.size,
+                        etag=obj.etag,
+                        created_at=obj.last_modified,
+                        tag=parsed.tag,
                     )
+                )
 
             return packages
 
         except Exception as e:
             logger.error("Error listing packages", error=str(e))
             raise StorageError(f"Error listing packages: {e}", cause=e)
+
+    async def put_metadata(self, key: str, data: bytes) -> None:
+        """Store a bookkeeping document."""
+        logger.debug("Writing metadata", key=key, size=len(data))
+
+        try:
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                lambda: self.client.put_object(
+                    bucket_name=self.bucket,
+                    object_name=key,
+                    data=BytesIO(data),
+                    length=len(data),
+                    content_type="application/json",
+                ),
+            )
+        except Exception as e:
+            logger.error("Error writing metadata", key=key, error=str(e))
+            raise StorageError(f"Error writing metadata: {e}", cause=e)
+
+    async def get_metadata(self, key: str) -> bytes | None:
+        """Read a bookkeeping document."""
+        try:
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(None, self.client.get_object, self.bucket, key)
+            try:
+                return bytes(await loop.run_in_executor(None, response.read))
+            finally:
+                response.close()
+                response.release_conn()
+        except S3Error as e:
+            if e.code in {"NoSuchKey", "NoSuchBucket"}:
+                return None
+            logger.error("Error reading metadata", key=key, error=str(e))
+            raise StorageError(f"Error reading metadata: {e}", cause=e)
+        except Exception as e:
+            logger.error("Error reading metadata", key=key, error=str(e))
+            raise StorageError(f"Error reading metadata: {e}", cause=e)
+
+    async def delete_metadata(self, key: str) -> bool:
+        """Delete a bookkeeping document."""
+        loop = asyncio.get_event_loop()
+
+        try:
+            await loop.run_in_executor(None, self.client.stat_object, self.bucket, key)
+        except S3Error as e:
+            if e.code in {"NoSuchKey", "NoSuchBucket"}:
+                return False
+            raise StorageError(f"Error deleting metadata: {e}", cause=e)
+
+        try:
+            await loop.run_in_executor(None, self.client.remove_object, self.bucket, key)
+            return True
+        except Exception as e:
+            logger.error("Error deleting metadata", key=key, error=str(e))
+            raise StorageError(f"Error deleting metadata: {e}", cause=e)
+
+    async def list_metadata(self, prefix: str) -> list[str]:
+        """List bookkeeping document keys under a prefix."""
+        try:
+            loop = asyncio.get_event_loop()
+            objects = await loop.run_in_executor(
+                None,
+                lambda: list(self.client.list_objects(self.bucket, prefix=prefix, recursive=True)),
+            )
+            return sorted(obj.object_name for obj in objects)
+        except Exception as e:
+            logger.error("Error listing metadata", prefix=prefix, error=str(e))
+            raise StorageError(f"Error listing metadata: {e}", cause=e)
 
     async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""
