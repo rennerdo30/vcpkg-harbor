@@ -64,6 +64,39 @@ VCPKG_DASHBOARD_ENABLED=true  # or false
 VCPKG_DASHBOARD_PATH=/dashboard
 ```
 
+### Serve Under a Sub-Path
+
+Behind a reverse proxy that mounts vcpkg-harbor below the domain root, tell the
+application about the prefix. Every link, image and background request is then
+generated with it:
+
+```bash
+VCPKG_PROXY_ROOT_PATH=/harbor
+```
+
+See [Configuration](/getting-started/configuration/#reverse-proxy-settings) for
+the matching nginx snippets.
+
+## Embedding the Dashboard
+
+The dashboard uses no root-absolute URLs, so it can be embedded in another page:
+
+```html
+<iframe src="https://example.com/harbor/" title="vcpkg-harbor dashboard"></iframe>
+```
+
+Two things make this work in a locked-down environment:
+
+- Tailwind CSS and HTMX are served from `/static` by default
+  (`VCPKG_DASHBOARD_ASSETS=local`), and no markup carries inline scripts or
+  styles, so a strict `Content-Security-Policy` does not break the page.
+- Nothing restricts framing unless you ask for it. To limit who may embed the
+  dashboard, set a `frame-ancestors` policy:
+
+  ```bash
+  VCPKG_PROXY_FRAME_ANCESTORS="'self' https://portal.example.com"
+  ```
+
 ## HTMX Live Updates
 
 The dashboard uses HTMX for automatic updates:
@@ -74,7 +107,15 @@ The dashboard uses HTMX for automatic updates:
 
 ## Customization
 
-The dashboard uses Tailwind CSS loaded from CDN. Templates are in:
+Design tokens and component classes live in
+`src/vcpkg_harbor/static/src/tailwind.css`. After editing them - or the utility
+classes used in the templates - rebuild the vendored stylesheet:
+
+```bash
+./scripts/build-dashboard-assets.sh
+```
+
+Templates are in:
 
 ```
 src/vcpkg_harbor/dashboard/templates/
@@ -83,7 +124,19 @@ src/vcpkg_harbor/dashboard/templates/
 ├── packages.html
 ├── package_detail.html
 ├── stats.html
+├── 404.html
+├── _macros.html
 └── partials/
     ├── stats_summary.html
-    └── recent_packages.html
+    ├── recent_packages.html
+    └── package_table.html
+```
+
+Links inside templates go through the `url_path()` helper rather than being
+written out as `/packages`, so they keep working under a sub-path:
+
+```jinja
+<a href="{{ url_path('packages_list') }}">Packages</a>
+<img src="{{ url_path('static', path='logo.svg') }}" alt="">
+<div hx-get="{{ url_path('stats_summary_partial') }}"></div>
 ```

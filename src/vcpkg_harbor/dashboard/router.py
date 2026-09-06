@@ -8,6 +8,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from vcpkg_harbor.dashboard.filters import register_filters
+from vcpkg_harbor.dashboard.urls import register_url_helpers, template_context
+
 if TYPE_CHECKING:
     from vcpkg_harbor.services.package_service import PackageService
     from vcpkg_harbor.services.stats_service import StatsService
@@ -16,9 +19,20 @@ logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["dashboard"])
 
-# Set up templates
+# Set up templates. The shared context processor and the url_path global keep the
+# templates free of root-absolute URLs, so the dashboard also works when it is
+# served under a prefix or embedded in an iframe.
 TEMPLATE_DIR = Path(__file__).parent / "templates"
-templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+templates = Jinja2Templates(directory=str(TEMPLATE_DIR), context_processors=[template_context])
+register_filters(templates.env)
+register_url_helpers(templates.env)
+
+# Listing sizes used by the dashboard pages.
+PACKAGES_PER_PAGE = 20
+RECENT_PACKAGES_LIMIT = 5
+LARGEST_PACKAGES_LIMIT = 10
+PACKAGE_VERSIONS_LIMIT = 50
+FIRST_PAGE = 1
 
 
 def get_stats_service(request: Request) -> "StatsService":
@@ -41,13 +55,12 @@ async def dashboard_home(request: Request) -> HTMLResponse:
     request_stats = stats_service.get_request_stats()
     uptime = stats_service.get_uptime_human()
 
-    recent_packages = await package_service.get_recent_packages(limit=5)
+    recent_packages = await package_service.get_recent_packages(limit=RECENT_PACKAGES_LIMIT)
 
     return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
-            "request": request,
+        request,
+        "index.html",
+        {
             "cache_stats": cache_stats,
             "request_stats": request_stats,
             "uptime": uptime,
@@ -56,35 +69,52 @@ async def dashboard_home(request: Request) -> HTMLResponse:
     )
 
 
+def _parse_page(raw_page: str) -> int:
+    """Parse the ``page`` query parameter, falling back to the first page."""
+    try:
+        return max(FIRST_PAGE, int(raw_page))
+    except ValueError:
+        logger.debug("Ignoring invalid page parameter", page=raw_page)
+        return FIRST_PAGE
+
+
+async def _load_package_listing(request: Request) -> dict[str, object]:
+    """Build the template context shared by the packages page and its partial."""
+    package_service = get_package_service(request)
+
+    search = request.query_params.get("search", "").strip()
+    page = _parse_page(request.query_params.get("page", str(FIRST_PAGE)))
+    offset = (page - FIRST_PAGE) * PACKAGES_PER_PAGE
+
+    if search:
+        packages = await package_service.search_packages(search, limit=PACKAGES_PER_PAGE)
+    else:
+        packages = await package_service.get_package_summaries(
+            limit=PACKAGES_PER_PAGE, offset=offset
+        )
+
+    logger.debug("Loaded package listing", search=search, page=page, results=len(packages))
+    return {
+        "packages": packages,
+        "search": search,
+        "page": page,
+        "limit": PACKAGES_PER_PAGE,
+    }
+
+
 @router.get("/packages", response_class=HTMLResponse)
 async def packages_list(request: Request) -> HTMLResponse:
     """Render the packages list page."""
     stats_service = get_stats_service(request)
-    package_service = get_package_service(request)
 
     cache_stats = await stats_service.get_cache_stats()
     uptime = stats_service.get_uptime_human()
 
-    # Get query parameters
-    search = request.query_params.get("search", "")
-    page = int(request.query_params.get("page", 1))
-    limit = 20
-    offset = (page - 1) * limit
-
-    if search:
-        packages = await package_service.search_packages(search, limit=limit)
-    else:
-        packages = await package_service.get_package_summaries(limit=limit, offset=offset)
-
     return templates.TemplateResponse(
-        request=request,
-        name="packages.html",
-        context={
-            "request": request,
-            "packages": packages,
-            "search": search,
-            "page": page,
-            "limit": limit,
+        request,
+        "packages.html",
+        {
+            **await _load_package_listing(request),
             "cache_stats": cache_stats,
             "uptime": uptime,
         },
@@ -100,14 +130,13 @@ async def package_detail(request: Request, name: str) -> HTMLResponse:
     cache_stats = await stats_service.get_cache_stats()
     uptime = stats_service.get_uptime_human()
 
-    versions = await package_service.get_package_versions(name, limit=50)
+    versions = await package_service.get_package_versions(name, limit=PACKAGE_VERSIONS_LIMIT)
 
     if not versions:
         return templates.TemplateResponse(
-            request=request,
-            name="404.html",
-            context={
-                "request": request,
+            request,
+            "404.html",
+            {
                 "message": f"Package '{name}' not found",
                 "cache_stats": cache_stats,
                 "uptime": uptime,
@@ -118,10 +147,9 @@ async def package_detail(request: Request, name: str) -> HTMLResponse:
     total_size = sum(v.size for v in versions)
 
     return templates.TemplateResponse(
-        request=request,
-        name="package_detail.html",
-        context={
-            "request": request,
+        request,
+        "package_detail.html",
+        {
             "name": name,
             "versions": versions,
             "total_size": total_size,
@@ -141,13 +169,12 @@ async def stats_page(request: Request) -> HTMLResponse:
     request_stats = stats_service.get_request_stats()
     uptime = stats_service.get_uptime_human()
 
-    largest_packages = await package_service.get_largest_packages(limit=10)
+    largest_packages = await package_service.get_largest_packages(limit=LARGEST_PACKAGES_LIMIT)
 
     return templates.TemplateResponse(
-        request=request,
-        name="stats.html",
-        context={
-            "request": request,
+        request,
+        "stats.html",
+        {
             "cache_stats": cache_stats,
             "request_stats": request_stats,
             "uptime": uptime,
@@ -168,10 +195,9 @@ async def stats_summary_partial(request: Request) -> HTMLResponse:
     request_stats = stats_service.get_request_stats()
 
     return templates.TemplateResponse(
-        request=request,
-        name="partials/stats_summary.html",
-        context={
-            "request": request,
+        request,
+        "partials/stats_summary.html",
+        {
             "cache_stats": cache_stats,
             "request_stats": request_stats,
         },
@@ -183,13 +209,22 @@ async def recent_packages_partial(request: Request) -> HTMLResponse:
     """Render recent packages partial for HTMX updates."""
     package_service = get_package_service(request)
 
-    recent_packages = await package_service.get_recent_packages(limit=5)
+    recent_packages = await package_service.get_recent_packages(limit=RECENT_PACKAGES_LIMIT)
 
     return templates.TemplateResponse(
-        request=request,
-        name="partials/recent_packages.html",
-        context={
-            "request": request,
+        request,
+        "partials/recent_packages.html",
+        {
             "recent_packages": recent_packages,
         },
+    )
+
+
+@router.get("/partials/packages", response_class=HTMLResponse)
+async def packages_table_partial(request: Request) -> HTMLResponse:
+    """Render the package table for HTMX-driven search-as-you-type."""
+    return templates.TemplateResponse(
+        request,
+        "partials/package_table.html",
+        await _load_package_listing(request),
     )

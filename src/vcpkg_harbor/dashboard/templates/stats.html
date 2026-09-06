@@ -1,150 +1,95 @@
 {% extends "base.html" %}
+{% from "_macros.html" import data_row, empty_state, stat_card %}
 
 {% block title %}Statistics - vcpkg-harbor{% endblock %}
 
 {% block page_title %}Statistics{% endblock %}
 
+{% block page_description %}
+<p class="mt-2 max-w-2xl text-sm text-slate-500">
+    Cache and request counters collected since the server started ({{ uptime }} ago).
+</p>
+{% endblock %}
+
 {% block content %}
 <div class="space-y-6">
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-indigo-500">
-            <p class="text-gray-500 text-sm">Total Packages</p>
-            <p class="text-3xl font-bold text-gray-900">{{ cache_stats.total_packages }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-            <p class="text-gray-500 text-sm">Storage Used</p>
-            <p class="text-3xl font-bold text-gray-900">{{ cache_stats.total_size_human }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-            <p class="text-gray-500 text-sm">Hit Rate</p>
-            <p class="text-3xl font-bold text-gray-900">{{ "%.1f"|format(cache_stats.hit_rate) }}%</p>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
-            <p class="text-gray-500 text-sm">Unique Packages</p>
-            <p class="text-3xl font-bold text-gray-900">{{ cache_stats.unique_package_names }}</p>
-        </div>
+    <!-- Stat cards -->
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+        {{ stat_card("Cached binaries", cache_stats.total_packages|count, "package") }}
+        {{ stat_card("Storage used", cache_stats.total_size_bytes|filesize, "storage") }}
+        {{ stat_card("Hit rate", "%.1f%%"|format(cache_stats.hit_rate), "speed") }}
+        {{ stat_card("Unique packages", cache_stats.unique_package_names|count, "activity") }}
     </div>
 
-    <!-- Detailed Stats -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Cache Stats -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h2 class="text-lg font-semibold text-gray-900">Cache Statistics</h2>
+    <!-- Detailed stats -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <section class="card" aria-labelledby="cache-stats-title">
+            <div class="card-header">
+                <h2 id="cache-stats-title" class="card-title">Cache statistics</h2>
+                <span class="badge bg-slate-100 text-slate-600 ring-1 ring-slate-200">{{ cache_stats.backend_type
+                    }}</span>
             </div>
-            <div class="p-6">
-                <dl class="space-y-4">
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Cache Hits</dt>
-                        <dd class="font-semibold text-green-600">{{ cache_stats.cache_hits }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Cache Misses</dt>
-                        <dd class="font-semibold text-red-600">{{ cache_stats.cache_misses }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Uploads</dt>
-                        <dd class="font-semibold text-blue-600">{{ cache_stats.uploads }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Downloads</dt>
-                        <dd class="font-semibold text-indigo-600">{{ cache_stats.downloads }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Errors</dt>
-                        <dd class="font-semibold {% if cache_stats.errors > 0 %}text-red-600{% else %}text-gray-600{% endif %}">{{ cache_stats.errors }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Backend</dt>
-                        <dd class="font-semibold text-gray-900">{{ cache_stats.backend_type }}</dd>
-                    </div>
+            <div class="card-body">
+                <dl class="space-y-3">
+                    {{ data_row("Cache hits", cache_stats.cache_hits|count, "text-emerald-700") }}
+                    {{ data_row("Cache misses", cache_stats.cache_misses|count, "text-slate-900") }}
+                    {{ data_row("Uploads", cache_stats.uploads|count) }}
+                    {{ data_row("Downloads", cache_stats.downloads|count) }}
+                    {{ data_row("Errors", cache_stats.errors|count, "text-rose-600" if cache_stats.errors else "text-slate-900") }}
+                    {{ data_row("Unique packages", cache_stats.unique_package_names|count) }}
                 </dl>
             </div>
-        </div>
+        </section>
 
-        <!-- Request Stats -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h2 class="text-lg font-semibold text-gray-900">Request Statistics</h2>
+        <section class="card" aria-labelledby="request-stats-title">
+            <div class="card-header">
+                <h2 id="request-stats-title" class="card-title">Request statistics</h2>
             </div>
-            <div class="p-6">
-                <dl class="space-y-4">
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Total Requests</dt>
-                        <dd class="font-semibold text-gray-900">{{ request_stats.total_requests }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">HEAD Requests</dt>
-                        <dd class="font-semibold text-gray-900">{{ request_stats.head_requests }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">GET Requests</dt>
-                        <dd class="font-semibold text-gray-900">{{ request_stats.get_requests }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">PUT Requests</dt>
-                        <dd class="font-semibold text-gray-900">{{ request_stats.put_requests }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Avg Response Time</dt>
-                        <dd class="font-semibold text-gray-900">{{ "%.2f"|format(request_stats.avg_response_time_ms) }} ms</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-600">Requests/min</dt>
-                        <dd class="font-semibold text-gray-900">{{ "%.2f"|format(request_stats.requests_per_minute) }}</dd>
-                    </div>
+            <div class="card-body">
+                <dl class="space-y-3">
+                    {{ data_row("Total requests", request_stats.total_requests|count) }}
+                    {{ data_row("HEAD requests", request_stats.head_requests|count) }}
+                    {{ data_row("GET requests", request_stats.get_requests|count) }}
+                    {{ data_row("PUT requests", request_stats.put_requests|count) }}
+                    {{ data_row("Average response time", "%.2f ms"|format(request_stats.avg_response_time_ms)) }}
+                    {{ data_row("Requests per minute", "%.2f"|format(request_stats.requests_per_minute)) }}
                 </dl>
             </div>
-        </div>
+        </section>
     </div>
 
-    <!-- Largest Packages -->
-    <div class="bg-white rounded-lg shadow">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h2 class="text-lg font-semibold text-gray-900">Largest Packages</h2>
+    <!-- Largest packages -->
+    <section class="card overflow-hidden" aria-labelledby="largest-title">
+        <div class="card-header">
+            <h2 id="largest-title" class="card-title">Largest cached builds</h2>
         </div>
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Package</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {% for pkg in largest_packages %}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <a href="/packages/{{ pkg.name }}" class="text-indigo-600 hover:text-indigo-900">
-                            {{ pkg.name }}
-                        </a>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{ pkg.version }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {% set size = pkg.size %}
-                        {% if size >= 1073741824 %}
-                            {{ "%.2f"|format(size / 1073741824) }} GB
-                        {% elif size >= 1048576 %}
-                            {{ "%.2f"|format(size / 1048576) }} MB
-                        {% elif size >= 1024 %}
-                            {{ "%.2f"|format(size / 1024) }} KB
-                        {% else %}
-                            {{ size }} B
-                        {% endif %}
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="3" class="px-6 py-4 text-center text-gray-500">
-                        No packages in cache
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        {% if largest_packages %}
+        <div class="table-wrap">
+            <table class="min-w-full divide-y divide-slate-200">
+                <caption class="sr-only">The largest cached builds by size</caption>
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th scope="col" class="th">Package</th>
+                        <th scope="col" class="th">Version</th>
+                        <th scope="col" class="th">Triplet</th>
+                        <th scope="col" class="th-num">Size</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for pkg in largest_packages %}
+                    <tr class="row">
+                        <td class="td"><a href="{{ url_path('package_detail', name=pkg.name) }}" class="link">{{ pkg.name }}</a></td>
+                        <td class="td font-mono text-xs">{{ pkg.version }}</td>
+                        <td class="td font-mono text-xs">{{ pkg.triplet }}</td>
+                        <td class="td-num">{{ pkg.size|filesize }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        {{ empty_state("No packages in the cache yet", "Once vcpkg uploads binaries, the biggest ones are listed here.", "package") }}
+        {% endif %}
+    </section>
 </div>
 {% endblock %}

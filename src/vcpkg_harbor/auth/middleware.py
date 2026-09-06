@@ -7,6 +7,8 @@ import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from vcpkg_harbor.core.paths import route_path
+
 if TYPE_CHECKING:
     from starlette.requests import Request
     from starlette.responses import Response
@@ -75,7 +77,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self, request: "Request", call_next: Callable[["Request"], Awaitable["Response"]]
     ) -> "Response":
         """Process the request and check authentication."""
-        path = request.url.path
+        # Behind a reverse proxy the forwarded path may carry the mount prefix
+        # (``/harbor/health``) while the tables above list route paths.
+        path = route_path(request)
 
         # Skip auth for public paths
         if self._is_public_path(path):
