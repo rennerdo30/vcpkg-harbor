@@ -18,9 +18,8 @@ def main() -> None:
         port=settings.server.port,
         workers=settings.server.workers,
         reload=settings.server.reload,
-        # Serving under a reverse proxy prefix; also set on the FastAPI app so
-        # the dashboard builds prefixed URLs even without these options.
-        root_path=settings.proxy.root_path,
+        # The application owns root_path normalization. Passing it to uvicorn
+        # also prepends it to the incoming path, doubling a preserved prefix.
         proxy_headers=True,
         forwarded_allow_ips=settings.proxy.forwarded_allow_ips,
         log_config=None,  # Use structlog instead
