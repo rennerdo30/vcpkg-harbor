@@ -1,0 +1,83 @@
+/*
+ * Tailwind source for the vcpkg-harbor dashboard.
+ *
+ * This file is the single source of truth for the design tokens and the
+ * component classes used by the templates. It is consumed twice:
+ *
+ *   1. Ahead of time by the Tailwind CLI, producing the vendored stylesheet
+ *      ../vendor/tailwind.css that the dashboard serves itself (the default).
+ *      Regenerate it with scripts/build-dashboard-assets.sh after changing
+ *      tokens, component classes or the utility classes used in templates.
+ *   2. At request time, inlined into a <style type="text/tailwindcss"> block
+ *      when dashboard.assets = "cdn", where Tailwind's browser build compiles
+ *      it live.
+ *
+ * Automatic source detection is disabled so the ahead-of-time build only scans
+ * the dashboard's own templates and scripts instead of the whole repository.
+ * Tailwind's browser build ignores @source and scans the live DOM instead.
+ */
+@import "tailwindcss" source(none);
+@source "../../dashboard/templates";
+@source "../js";
+
+@theme {
+  /* Brand ramp: the indigo of the logo, so accent colours live in one place. */
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+}
+
+@layer base {
+  /* Tailwind's reset gives buttons the default cursor; keep the pointer. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  /* Surfaces */
+  .card { @apply rounded-xl bg-white shadow-card ring-1 ring-slate-900/5; }
+  .card-header { @apply flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 px-5 py-4 sm:px-6; }
+  .card-title { @apply text-base font-semibold tracking-tight text-slate-900; }
+  .card-body { @apply px-5 py-5 sm:px-6; }
+
+  /* Metric tiles */
+  .stat-card { @apply flex items-start gap-4 rounded-xl bg-white p-5 shadow-card ring-1 ring-slate-900/5; }
+  .stat-icon { @apply grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-brand-100; }
+  .stat-label { @apply text-xs font-medium uppercase tracking-wide text-slate-500; }
+  .stat-value { @apply mt-1 truncate text-2xl font-semibold tracking-tight tabular-nums text-slate-900 sm:text-3xl; }
+
+  /* Controls */
+  .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-brand-700 active:bg-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2; }
+  .btn-secondary { @apply inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-card ring-1 ring-slate-300 transition-colors duration-150 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2; }
+  .btn-icon { @apply inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400; }
+  .input-search { @apply w-full rounded-lg border-0 bg-white py-2 pl-10 pr-3 text-sm text-slate-900 shadow-card ring-1 ring-slate-300 transition placeholder:text-slate-400 focus:ring-2 focus:ring-brand-500; }
+
+  /* Links */
+  .link { @apply rounded font-medium text-brand-700 underline-offset-2 transition-colors hover:text-brand-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500; }
+  .nav-link { @apply whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-brand-100 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80; }
+  .nav-link-active { @apply bg-white/15 text-white ring-1 ring-inset ring-white/25; }
+  .footer-link { @apply rounded text-slate-500 transition-colors hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500; }
+
+  /* Tables */
+  .table-wrap { @apply overflow-x-auto; }
+  .th { @apply whitespace-nowrap px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6; }
+  .th-num { @apply whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-6; }
+  .td { @apply whitespace-nowrap px-5 py-4 text-sm text-slate-600 sm:px-6; }
+  .td-num { @apply whitespace-nowrap px-5 py-4 text-right text-sm tabular-nums text-slate-600 sm:px-6; }
+  .row { @apply transition-colors hover:bg-slate-50; }
+
+  /* Misc */
+  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+  .code-block { @apply overflow-x-auto rounded-lg bg-slate-900 px-4 py-3 text-sm text-brand-200; }
+}

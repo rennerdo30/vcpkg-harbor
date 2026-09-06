@@ -19,6 +19,14 @@ from vcpkg_harbor.auth import (
 )
 from vcpkg_harbor.core.config import Settings, get_settings
 from vcpkg_harbor.core.logging import setup_logging
+from vcpkg_harbor.core.middleware import FrameHeadersMiddleware, RootPathMiddleware
+from vcpkg_harbor.core.paths import (
+    API_DOCS_PATH,
+    API_OPENAPI_PATH,
+    API_REDOC_PATH,
+    STATIC_ROUTE_NAME,
+    STATIC_URL_PATH,
+)
 from vcpkg_harbor.dashboard import router as dashboard_router
 from vcpkg_harbor.services import CacheService, PackageService, StatsService, TagService
 from vcpkg_harbor.storage.registry import get_storage_backend
@@ -95,19 +103,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Set up logging
     setup_logging(settings)
 
-    # Create FastAPI app
+    # Create FastAPI app. root_path makes every generated URL (docs, dashboard
+    # links, HTMX endpoints) include the prefix the app is served under.
     app = FastAPI(
         title="vcpkg-harbor",
         description="Binary cache server for vcpkg with plugin-based storage backends",
         version=__version__,
         lifespan=lifespan,
-        docs_url="/api/docs",
-        redoc_url="/api/redoc",
-        openapi_url="/api/openapi.json",
+        docs_url=API_DOCS_PATH,
+        redoc_url=API_REDOC_PATH,
+        openapi_url=API_OPENAPI_PATH,
+        root_path=settings.proxy.root_path,
     )
 
     # Store settings in app state
     app.state.settings = settings
+
+    # Middleware, innermost first: add_middleware() puts each new layer outside
+    # the previous one, so the request path is normalised before anything else
+    # inspects it and the framing headers reach even an auth rejection.
 
     # Set up authentication if enabled
     if settings.auth.enabled:
@@ -129,6 +143,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     else:
         logger.debug("Authentication disabled")
 
+    # Framing headers, if the deployment restricts who may embed the dashboard.
+    # Without them any page may embed it, which is the historical behaviour.
+    if settings.proxy.frame_ancestors or settings.proxy.frame_options:
+        app.add_middleware(
+            FrameHeadersMiddleware,
+            frame_ancestors=settings.proxy.frame_ancestors,
+            frame_options=settings.proxy.frame_options,
+        )
+        logger.info(
+            "Frame headers enabled",
+            frame_ancestors=settings.proxy.frame_ancestors,
+            frame_options=settings.proxy.frame_options,
+        )
+
+    # Outermost layer: make a prefix-stripping proxy look like a prefix-keeping
+    # one, so the /static mount resolves either way.
+    if settings.proxy.root_path:
+        app.add_middleware(RootPathMiddleware, root_path=settings.proxy.root_path)
+
     # Include routers
     app.include_router(health_router)
 
@@ -141,7 +174,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Mount static files
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():
-        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+        app.mount(STATIC_URL_PATH, StaticFiles(directory=str(static_dir)), name=STATIC_ROUTE_NAME)
 
     # Dashboard routes
     if settings.dashboard.enabled:
@@ -152,6 +185,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         auth_enabled=settings.auth.enabled,
         metrics_enabled=settings.metrics.enabled,
         dashboard_enabled=settings.dashboard.enabled,
+        root_path=settings.proxy.root_path or "/",
+        dashboard_assets=settings.dashboard.assets,
     )
 
     return app

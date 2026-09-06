@@ -7,6 +7,11 @@ from typing import Any, Literal
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from vcpkg_harbor.core.paths import PATH_SEPARATOR, normalize_prefix
+
+#: Accepted values for the X-Frame-Options header.
+FRAME_OPTIONS_VALUES: frozenset[str] = frozenset({"DENY", "SAMEORIGIN"})
+
 # Default pattern for build tag names: a conservative, URL and object-store safe
 # subset that cannot contain path separators or start with harbor's reserved
 # underscore prefix.
@@ -36,6 +41,75 @@ class ServerSettings(BaseSettings):
     reload: bool = Field(default=False, description="Enable auto-reload for development")
     read_only: bool = Field(default=False, description="Run server in read-only mode")
     write_only: bool = Field(default=False, description="Run server in write-only mode")
+
+
+class ProxySettings(BaseSettings):
+    """Reverse proxy and embedding configuration.
+
+    Everything needed to serve vcpkg-harbor from somewhere other than a domain
+    root: the mount prefix (``root_path``), which client IPs may set forwarding
+    headers, and the frame headers that decide whether the dashboard may be
+    embedded in an ``<iframe>``.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="VCPKG_PROXY_",
+        env_file=".env",
+        extra="ignore",
+    )
+
+    root_path: str = Field(
+        default="",
+        description=(
+            "Path prefix the application is served under, e.g. '/harbor'. "
+            "Equivalent to uvicorn's --root-path; leave empty when serving from "
+            "the domain root."
+        ),
+    )
+    forwarded_allow_ips: str | None = Field(
+        default=None,
+        description=(
+            "Comma-separated client IPs trusted to send X-Forwarded-* headers, "
+            "or '*' to trust any. Passed to uvicorn."
+        ),
+    )
+    frame_ancestors: str | None = Field(
+        default=None,
+        description=(
+            "Content-Security-Policy frame-ancestors value, e.g. \"'self' "
+            'https://intranet.example.com". Unset means no CSP header is sent, '
+            "so any page may embed the dashboard."
+        ),
+    )
+    frame_options: str | None = Field(
+        default=None,
+        description=(
+            "X-Frame-Options value (DENY or SAMEORIGIN). Unset means the header "
+            "is not sent. Prefer frame_ancestors, which modern browsers honour."
+        ),
+    )
+
+    @field_validator("root_path")
+    @classmethod
+    def normalize_root_path(cls, v: str) -> str:
+        """Normalise the prefix to either an empty string or '/segment'."""
+        stripped = normalize_prefix(v.strip())
+        if not stripped:
+            return ""
+        return stripped if stripped.startswith(PATH_SEPARATOR) else f"{PATH_SEPARATOR}{stripped}"
+
+    @field_validator("frame_options")
+    @classmethod
+    def validate_frame_options(cls, v: str | None) -> str | None:
+        """Validate the X-Frame-Options value."""
+        if v is None or not v.strip():
+            return None
+        value = v.strip().upper()
+        if value not in FRAME_OPTIONS_VALUES:
+            raise ValueError(
+                f"Invalid frame_options: {v}. Must be one of {sorted(FRAME_OPTIONS_VALUES)}"
+            )
+        return value
 
 
 class StorageSettings(BaseSettings):
@@ -266,6 +340,15 @@ class DashboardSettings(BaseSettings):
 
     enabled: bool = Field(default=True, description="Enable web dashboard")
     path: str = Field(default="/", description="Dashboard base path")
+    assets: Literal["local", "cdn"] = Field(
+        default="local",
+        description=(
+            "Where the dashboard loads Tailwind CSS and HTMX from. 'local' serves "
+            "the vendored copies from /static, which is what a page with a strict "
+            "Content-Security-Policy or an air-gapped network needs; 'cdn' loads "
+            "them from jsDelivr instead."
+        ),
+    )
 
 
 class Settings(BaseSettings):
@@ -278,6 +361,7 @@ class Settings(BaseSettings):
     )
 
     server: ServerSettings = Field(default_factory=ServerSettings)
+    proxy: ProxySettings = Field(default_factory=ProxySettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
     tags: TagSettings = Field(default_factory=TagSettings)
     minio: MinioSettings = Field(default_factory=MinioSettings)
