@@ -92,7 +92,21 @@ vcpkg install zlib boost
 
 ## Configuration
 
-vcpkg-harbor is configured via environment variables:
+vcpkg-harbor is configured via environment variables, optionally loaded from a
+`.env` file in the working directory. Start from the template:
+
+```bash
+cp .env.example .env
+# then edit .env and replace the placeholders with your own values
+```
+
+`.env.example` lists every supported variable with placeholder values and is the
+only env file tracked in git. **Never commit `.env`** - it holds your real
+endpoints, access keys and tokens, and it is ignored via `.gitignore`. In Docker
+or Kubernetes, prefer injecting the variables (or mounted secrets) directly
+instead of shipping a `.env` file.
+
+Common settings:
 
 ```bash
 # Server
