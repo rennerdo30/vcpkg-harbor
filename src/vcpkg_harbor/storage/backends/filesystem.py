@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import aiofiles
 import aiofiles.os
@@ -312,7 +313,7 @@ class FilesystemBackend:
             path.parent.mkdir(parents=True, exist_ok=True)
             # Write to a temporary file and rename, so a reader never observes a
             # partially written document.
-            tmp_path = path.with_name(f"{path.name}.tmp")
+            tmp_path = path.with_name(f"{path.name}.{uuid4().hex}.tmp")
             async with aiofiles.open(tmp_path, "wb") as f:
                 await f.write(data)
             os.replace(tmp_path, path)

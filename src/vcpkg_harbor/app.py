@@ -129,11 +129,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     else:
         logger.debug("Authentication disabled")
 
-    # Mount static files
-    static_dir = Path(__file__).parent / "static"
-    if static_dir.exists():
-        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-
     # Include routers
     app.include_router(health_router)
 
@@ -142,6 +137,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Cache API routes (vcpkg protocol)
     app.include_router(cache_router)
+
+    # Mount static files
+    static_dir = Path(__file__).parent / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     # Dashboard routes
     if settings.dashboard.enabled:

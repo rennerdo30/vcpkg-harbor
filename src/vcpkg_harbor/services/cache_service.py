@@ -1,5 +1,6 @@
 """Cache service for handling package operations."""
 
+import hashlib
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -8,6 +9,7 @@ import structlog
 
 from vcpkg_harbor.core.exceptions import (
     PackageAlreadyExistsError,
+    PackageContentConflictError,
     PackageNotFoundError,
     StorageError,
 )
@@ -173,9 +175,9 @@ class CacheService:
         """Store a package in the cache.
 
         With deduplication enabled the bytes are stored once per package
-        identity. Uploading a package that another tag already holds only adds a
-        reference, so the request body is discarded instead of being written a
-        second time.
+        identity, after verifying that the uploaded bytes match the stored bytes.
+        Different content for an existing identity is rejected without adding a
+        reference to the requesting namespace.
 
         Args:
             name: Package name
@@ -193,60 +195,70 @@ class CacheService:
             PackageAlreadyExistsError: If the namespace already holds the package
             StorageError: If there's an error storing the package
         """
-        key = PackageKey(name, version, sha, triplet)
-        namespace = self.tags.resolve_namespace(tag)
+        async with self.tags.mutation_lock:
+            key = PackageKey(name, version, sha, triplet)
+            namespace = self.tags.resolve_namespace(tag)
 
-        if self._read_only:
-            logger.warning(
-                "Write operation blocked in read-only mode",
-                package=key.path,
+            if self._read_only:
+                logger.warning(
+                    "Write operation blocked in read-only mode",
+                    package=key.path,
+                    namespace=namespace,
+                )
+                raise StorageError("Server is in read-only mode")
+
+            logger.info("Uploading package", package=key.path, namespace=namespace, size=size)
+
+            if not self.tags.enabled:
+                # Build tags disabled: behave exactly like the untagged flat layout.
+                info = await self._store_bytes(key, data, size, scope=None)
+                return StoredPackage(info=info, namespace=namespace, tag=tag)
+
+            # A package stored before the index existed is claimed by the default
+            # namespace first, so tagging it never hides it from untagged clients.
+            await self.tags.adopt_legacy(key)
+
+            visible, existing_scope = await self.tags.resolve_read(namespace, key)
+            if visible and await self.storage.exists(
+                name, version, sha, triplet, scope=existing_scope
+            ):
+                logger.warning("Package already exists", package=key.path, namespace=namespace)
+                raise PackageAlreadyExistsError(name, version, sha, triplet)
+
+            scope = self.tags.object_scope(namespace)
+            deduplicated = await self.storage.exists(name, version, sha, triplet, scope=scope)
+
+            if deduplicated:
+                incoming_digest = await self._digest(data)
+                stored_digest = await self._digest(
+                    self.storage.get(name, version, sha, triplet, scope=scope)
+                )
+                if incoming_digest != stored_digest:
+                    raise PackageContentConflictError(
+                        "Package identity already contains different bytes; use a new ABI hash "
+                        "or disable cross-tag deduplication"
+                    )
+                info = await self.storage.stat(name, version, sha, triplet, scope=scope)
+                logger.info(
+                    "Package deduplicated, added a reference instead of storing bytes",
+                    package=key.path,
+                    namespace=namespace,
+                    size=info.size,
+                )
+            else:
+                info = await self._store_bytes(key, data, size, scope=scope)
+
+            info.tag = tag
+            await self.tags.register(namespace, key, info.size, scope=scope)
+            evicted = await self.tags.enforce_retention(namespace, keep=key)
+
+            return StoredPackage(
+                info=info,
                 namespace=namespace,
+                tag=tag,
+                deduplicated=deduplicated,
+                evicted=len(evicted),
             )
-            raise StorageError("Server is in read-only mode")
-
-        logger.info("Uploading package", package=key.path, namespace=namespace, size=size)
-
-        if not self.tags.enabled:
-            # Build tags disabled: behave exactly like the untagged flat layout.
-            info = await self._store_bytes(key, data, size, scope=None)
-            return StoredPackage(info=info, namespace=namespace, tag=tag)
-
-        # A package stored before the index existed is claimed by the default
-        # namespace first, so tagging it never hides it from untagged clients.
-        await self.tags.adopt_legacy(key)
-
-        visible, _ = await self.tags.resolve_read(namespace, key)
-        if visible:
-            logger.warning("Package already exists", package=key.path, namespace=namespace)
-            raise PackageAlreadyExistsError(name, version, sha, triplet)
-
-        scope = self.tags.object_scope(namespace)
-        deduplicated = await self.storage.exists(name, version, sha, triplet, scope=scope)
-
-        if deduplicated:
-            discarded = await self._discard(data)
-            info = await self.storage.stat(name, version, sha, triplet, scope=scope)
-            logger.info(
-                "Package deduplicated, added a reference instead of storing bytes",
-                package=key.path,
-                namespace=namespace,
-                size=info.size,
-                discarded_bytes=discarded,
-            )
-        else:
-            info = await self._store_bytes(key, data, size, scope=scope)
-
-        info.tag = tag
-        await self.tags.register(namespace, key, info.size, scope=scope)
-        evicted = await self.tags.enforce_retention(namespace, keep=key)
-
-        return StoredPackage(
-            info=info,
-            namespace=namespace,
-            tag=tag,
-            deduplicated=deduplicated,
-            evicted=len(evicted),
-        )
 
     async def _store_bytes(
         self,
@@ -270,16 +282,12 @@ class CacheService:
             raise StorageError(f"Error uploading package: {e}", cause=e)
 
     @staticmethod
-    async def _discard(data: AsyncIterator[bytes]) -> int:
-        """Read and drop an upload body, returning the number of bytes read.
-
-        The client is already sending the payload, so it has to be consumed even
-        though the bytes are already in storage.
-        """
-        discarded = 0
+    async def _digest(data: AsyncIterator[bytes]) -> bytes:
+        """Hash a stream without buffering the package in memory."""
+        digest = hashlib.sha256()
         async for chunk in data:
-            discarded += len(chunk)
-        return discarded
+            digest.update(chunk)
+        return digest.digest()
 
     async def delete_package(
         self,
@@ -308,50 +316,55 @@ class CacheService:
         Raises:
             StorageError: If there's an error deleting the package
         """
-        key = PackageKey(name, version, sha, triplet)
-        namespace = self.tags.resolve_namespace(tag)
+        async with self.tags.mutation_lock:
+            key = PackageKey(name, version, sha, triplet)
+            namespace = self.tags.resolve_namespace(tag)
 
-        if self._read_only:
-            logger.warning(
-                "Delete operation blocked in read-only mode",
-                package=key.path,
-                namespace=namespace,
-            )
-            raise StorageError("Server is in read-only mode")
+            if self._read_only:
+                logger.warning(
+                    "Delete operation blocked in read-only mode",
+                    package=key.path,
+                    namespace=namespace,
+                )
+                raise StorageError("Server is in read-only mode")
 
-        logger.info("Deleting package", package=key.path, namespace=namespace)
+            logger.info("Deleting package", package=key.path, namespace=namespace)
 
-        try:
-            visible, scope = await self.tags.resolve_read(namespace, key)
-            if not visible:
-                logger.info("Package not found for deletion", package=key.path, namespace=namespace)
-                return False
-
-            if self.tags.enabled:
-                remaining = await self.tags.unregister(namespace, key)
-                if not self.tags.should_delete_object(scope, remaining):
+            try:
+                visible, scope = await self.tags.resolve_read(namespace, key)
+                if not visible:
                     logger.info(
-                        "Package still referenced by other namespaces, bytes kept",
-                        package=key.path,
-                        namespace=namespace,
-                        references=remaining,
+                        "Package not found for deletion", package=key.path, namespace=namespace
                     )
-                    return True
+                    return False
 
-            deleted = await self.storage.delete(name, version, sha, triplet, scope=scope)
-            if deleted:
-                logger.info("Package deleted", package=key.path, namespace=namespace)
-            else:
-                logger.info("Package not found for deletion", package=key.path, namespace=namespace)
-            return deleted
-        except Exception as e:
-            logger.error(
-                "Error deleting package",
-                package=key.path,
-                namespace=namespace,
-                error=str(e),
-            )
-            raise StorageError(f"Error deleting package: {e}", cause=e)
+                if self.tags.enabled:
+                    remaining = await self.tags.unregister(namespace, key)
+                    if not self.tags.should_delete_object(scope, remaining):
+                        logger.info(
+                            "Package still referenced by other namespaces, bytes kept",
+                            package=key.path,
+                            namespace=namespace,
+                            references=remaining,
+                        )
+                        return True
+
+                deleted = await self.storage.delete(name, version, sha, triplet, scope=scope)
+                if deleted:
+                    logger.info("Package deleted", package=key.path, namespace=namespace)
+                else:
+                    logger.info(
+                        "Package not found for deletion", package=key.path, namespace=namespace
+                    )
+                return deleted or (self.tags.enabled and visible)
+            except Exception as e:
+                logger.error(
+                    "Error deleting package",
+                    package=key.path,
+                    namespace=namespace,
+                    error=str(e),
+                )
+                raise StorageError(f"Error deleting package: {e}", cause=e)
 
     async def get_package_info(
         self,

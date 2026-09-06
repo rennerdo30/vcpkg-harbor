@@ -51,13 +51,19 @@ class PackageKey:
     """The identity of a cached package.
 
     vcpkg identifies a binary package by name, version, ABI hash and triplet;
-    two uploads sharing all four are byte-identical by construction.
+    content equality must be verified separately before sharing stored bytes.
     """
 
     name: str
     version: str
     sha: str
     triplet: str
+
+    def __post_init__(self) -> None:
+        """Reject unsafe and internal identities before any storage operation."""
+        _check_segments(self.name, self.version, self.sha, self.triplet)
+        if is_reserved_key(self.path):
+            raise InvalidKeyError("Package name is reserved for internal storage")
 
     @property
     def path(self) -> str:

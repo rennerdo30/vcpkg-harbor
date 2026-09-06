@@ -64,9 +64,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # Dashboard paths (if excluded)
         if self.exclude_dashboard:
-            if path == "/" or path.startswith("/packages") or path.startswith("/stats"):
+            if path in {"/", "/packages", "/stats"}:
                 return True
-            if path.startswith("/partials/"):
+            if path.startswith("/packages/") and len(path.strip("/").split("/")) == 2:
+                return True
+            if path.startswith("/partials/") and len(path.strip("/").split("/")) < 4:
                 return True
 
         return False
@@ -78,7 +80,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # Skip auth for public paths
-        if self._is_public_path(path):
+        if request.method in {"GET", "HEAD"} and self._is_public_path(path):
             return await call_next(request)
 
         # Authenticate the request

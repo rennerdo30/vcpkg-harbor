@@ -4,7 +4,7 @@ import re
 from functools import lru_cache
 from typing import Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Default pattern for build tag names: a conservative, URL and object-store safe
@@ -32,7 +32,7 @@ class ServerSettings(BaseSettings):
 
     host: str = Field(default="0.0.0.0", description="Host to bind the server to")
     port: int = Field(default=15151, description="Port to bind the server to")
-    workers: int = Field(default=4, description="Number of worker processes")
+    workers: int = Field(default=1, ge=1, description="Number of worker processes")
     reload: bool = Field(default=False, description="Enable auto-reload for development")
     read_only: bool = Field(default=False, description="Run server in read-only mode")
     write_only: bool = Field(default=False, description="Run server in write-only mode")
@@ -288,6 +288,13 @@ class Settings(BaseSettings):
     auth: AuthSettings = Field(default_factory=AuthSettings)
     metrics: MetricsSettings = Field(default_factory=MetricsSettings)
     dashboard: DashboardSettings = Field(default_factory=DashboardSettings)
+
+    @model_validator(mode="after")
+    def validate_tag_workers(self) -> "Settings":
+        """The tag index requires a single writer process."""
+        if self.tags.enabled and self.server.workers != 1:
+            raise ValueError("Build tags require VCPKG_SERVER_WORKERS=1")
+        return self
 
     def get_storage_config(self) -> dict[str, Any]:
         """Get the configuration for the active storage backend."""

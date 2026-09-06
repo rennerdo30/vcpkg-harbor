@@ -26,10 +26,12 @@ from vcpkg_harbor.core.dependencies import CacheServiceDep, StatsServiceDep
 from vcpkg_harbor.core.exceptions import (
     InvalidTagError,
     PackageAlreadyExistsError,
+    PackageContentConflictError,
     PackageNotFoundError,
     StorageError,
     TagsDisabledError,
 )
+from vcpkg_harbor.storage.layout import InvalidKeyError
 
 logger = structlog.get_logger(__name__)
 
@@ -87,7 +89,7 @@ async def _check_package(
             stats_service.record_head_request(success=False)
             raise HTTPException(status_code=404, detail="Package not found")
 
-    except (InvalidTagError, TagsDisabledError) as e:
+    except (InvalidKeyError, InvalidTagError, TagsDisabledError) as e:
         raise _reject_bad_tag(e)
     except HTTPException:
         raise
@@ -152,7 +154,7 @@ async def _download_package(
             headers=headers,
         )
 
-    except (InvalidTagError, TagsDisabledError) as e:
+    except (InvalidKeyError, InvalidTagError, TagsDisabledError) as e:
         raise _reject_bad_tag(e)
     except HTTPException:
         raise
@@ -220,8 +222,10 @@ async def _upload_package(
             "evicted": stored.evicted,
         }
 
-    except (InvalidTagError, TagsDisabledError) as e:
+    except (InvalidKeyError, InvalidTagError, TagsDisabledError) as e:
         raise _reject_bad_tag(e)
+    except PackageContentConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except PackageAlreadyExistsError:
         stats_service.record_error()
         raise HTTPException(status_code=409, detail="Package already exists")
@@ -274,7 +278,7 @@ async def _delete_package(
         else:
             raise HTTPException(status_code=404, detail="Package not found")
 
-    except (InvalidTagError, TagsDisabledError) as e:
+    except (InvalidKeyError, InvalidTagError, TagsDisabledError) as e:
         raise _reject_bad_tag(e)
     except HTTPException:
         raise

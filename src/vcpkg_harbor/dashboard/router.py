@@ -44,8 +44,9 @@ async def dashboard_home(request: Request) -> HTMLResponse:
     recent_packages = await package_service.get_recent_packages(limit=5)
 
     return templates.TemplateResponse(
-        "index.html",
-        {
+        request=request,
+        name="index.html",
+        context={
             "request": request,
             "cache_stats": cache_stats,
             "request_stats": request_stats,
@@ -76,8 +77,9 @@ async def packages_list(request: Request) -> HTMLResponse:
         packages = await package_service.get_package_summaries(limit=limit, offset=offset)
 
     return templates.TemplateResponse(
-        "packages.html",
-        {
+        request=request,
+        name="packages.html",
+        context={
             "request": request,
             "packages": packages,
             "search": search,
@@ -102,8 +104,9 @@ async def package_detail(request: Request, name: str) -> HTMLResponse:
 
     if not versions:
         return templates.TemplateResponse(
-            "404.html",
-            {
+            request=request,
+            name="404.html",
+            context={
                 "request": request,
                 "message": f"Package '{name}' not found",
                 "cache_stats": cache_stats,
@@ -115,8 +118,9 @@ async def package_detail(request: Request, name: str) -> HTMLResponse:
     total_size = sum(v.size for v in versions)
 
     return templates.TemplateResponse(
-        "package_detail.html",
-        {
+        request=request,
+        name="package_detail.html",
+        context={
             "request": request,
             "name": name,
             "versions": versions,
@@ -140,8 +144,9 @@ async def stats_page(request: Request) -> HTMLResponse:
     largest_packages = await package_service.get_largest_packages(limit=10)
 
     return templates.TemplateResponse(
-        "stats.html",
-        {
+        request=request,
+        name="stats.html",
+        context={
             "request": request,
             "cache_stats": cache_stats,
             "request_stats": request_stats,
@@ -163,8 +168,9 @@ async def stats_summary_partial(request: Request) -> HTMLResponse:
     request_stats = stats_service.get_request_stats()
 
     return templates.TemplateResponse(
-        "partials/stats_summary.html",
-        {
+        request=request,
+        name="partials/stats_summary.html",
+        context={
             "request": request,
             "cache_stats": cache_stats,
             "request_stats": request_stats,
@@ -180,8 +186,9 @@ async def recent_packages_partial(request: Request) -> HTMLResponse:
     recent_packages = await package_service.get_recent_packages(limit=5)
 
     return templates.TemplateResponse(
-        "partials/recent_packages.html",
-        {
+        request=request,
+        name="partials/recent_packages.html",
+        context={
             "request": request,
             "recent_packages": recent_packages,
         },

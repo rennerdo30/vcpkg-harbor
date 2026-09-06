@@ -51,8 +51,8 @@ with either shape.
 ## Deduplication and reference counting
 
 vcpkg identifies a binary package by `name/version/sha/triplet`, and `sha` is the
-ABI hash. Two uploads that share all four are the same package, so harbor uses
-that 4-tuple as both the storage key and the deduplication key.
+ABI hash. Harbor uses that 4-tuple to locate a candidate for deduplication,
+then compares SHA-256 digests of both byte streams before sharing the object.
 
 ```mermaid
 flowchart LR
@@ -68,8 +68,9 @@ Consequences:
 - Uploading a package **the same tag** already holds is still `409 Conflict`.
 - Deleting a package from one tag only drops that tag's reference. Other tags
   keep working; the bytes are removed when the last reference goes.
-- Because the identity implies the content, an upload of *different* bytes under
-  an identity that already exists keeps the stored copy.
+- Uploading *different* bytes for an existing identity returns `409 Conflict`
+  and does not add a reference. Use a different ABI hash, or disable deduplication
+  to store different bytes in separate tags.
 
 Deduplication can be turned off with `VCPKG_TAGS_DEDUPE=false`, in which case
 each tag keeps a private copy of the bytes under
@@ -85,7 +86,8 @@ namespace:
   `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`.
 - If `VCPKG_TAGS_ALLOWED` is set, only the listed names are accepted.
 - The default namespace name (`_default`) is reserved and cannot be requested as
-  a tag.
+  a tag. Service prefixes (`static`, `partials`, `api`, `health`, `metrics`)
+  and `_harbor` are also reserved.
 
 A rejected tag returns `400 Bad Request` with the reason. If build tags are
 disabled entirely (`VCPKG_TAGS_ENABLED=false`) the tagged shape is not part of
@@ -144,9 +146,15 @@ no build tags, so:
 
 ## Limitations
 
-- Reference counter updates are serialised per package inside one worker process.
-  Two workers registering the same package in different tags at the same instant
-  can race, which may leave a reference count that is one too low. Deleting a tag
-  can then remove bytes another tag references; the other tag's next request is
-  a cache miss and re-uploads them.
+- Build tags require one server process and one deployment replica per storage
+  backend. The default is `VCPKG_SERVER_WORKERS=1`; configuring more workers with
+  tags enabled fails at startup. When launching uvicorn directly, also use
+  `--workers 1`. Distributed writers require a transactional shared index and
+  are not supported by this implementation.
+- Uploads, deletes and retention are serialized within the process to keep object
+  lifetime and reference updates consistent. Reads remain concurrent.
+- A missing object is a cache miss; a re-upload repairs it, and DELETE can remove
+  its stale membership record.
+- Retention scans a tag's membership records when limits are enabled. Large tags
+  can incur one metadata read per entry per upload.
 - The dashboard does not display tags yet; it lists stored packages.

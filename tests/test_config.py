@@ -22,7 +22,7 @@ def test_default_server_settings():
     settings = ServerSettings(_env_file=None)
     assert settings.host == "0.0.0.0"
     assert settings.port == 15151
-    assert settings.workers == 4
+    assert settings.workers == 1
     assert settings.read_only is False
     assert settings.write_only is False
 
@@ -137,3 +137,14 @@ def test_get_storage_config():
     settings.storage.type = "filesystem"
     config = settings.get_storage_config()
     assert "path" in config
+
+
+def test_tags_reject_multiple_workers():
+    import pytest
+    from pydantic import ValidationError
+
+    from vcpkg_harbor.core.config import Settings
+
+    with pytest.raises(ValidationError, match="WORKERS=1"):
+        Settings(server={"workers": 4}, tags={"enabled": True})
+    assert Settings(server={"workers": 4}, tags={"enabled": False}).server.workers == 4

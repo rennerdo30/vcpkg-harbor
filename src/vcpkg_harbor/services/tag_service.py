@@ -6,12 +6,10 @@ independent build streams can share one server:
 * ``/{tag}/{name}/{version}/{sha}/{triplet}`` -- tagged
 * ``/{name}/{version}/{sha}/{triplet}``       -- untagged, the default namespace
 
-Because a vcpkg binary package is fully identified by ``name/version/sha/triplet``
-(``sha`` being the ABI hash), the same 4-tuple seen under two tags is the same
-package. Harbor therefore stores the bytes once at the identity key and records
-which tags reference them, so a second upload of an identical package costs no
-extra storage. Deleting a package from one tag only drops that tag's reference;
-the bytes go away when the last reference does.
+A package identity selects the candidate shared object. CacheService verifies
+SHA-256 digests before adding a namespace reference, so an ABI hash alone never
+establishes content equality. Deleting a package from one tag only drops that
+tag's reference; the bytes go away when the last reference does.
 
 Two bookkeeping documents implement this, both under the reserved ``_harbor/``
 prefix and both written through the ``StorageBackend`` metadata API so every
@@ -112,6 +110,7 @@ class TagService:
             storage: Storage backend instance
             settings: Application settings
         """
+        self.mutation_lock = asyncio.Lock()
         self.storage = storage
         self.config: TagSettings = settings.tags
         self._pattern = re.compile(self.config.pattern)
@@ -154,8 +153,16 @@ class TagService:
         if not self.enabled:
             raise TagsDisabledError(tag)
 
-        if tag == self.default_namespace:
-            raise InvalidTagError(tag, "reserved for untagged requests")
+        if tag in {
+            self.default_namespace,
+            "_harbor",
+            "static",
+            "partials",
+            "api",
+            "health",
+            "metrics",
+        }:
+            raise InvalidTagError(tag, "reserved namespace or service path")
 
         if not self._pattern.fullmatch(tag):
             raise InvalidTagError(tag, "does not match the configured tag pattern")

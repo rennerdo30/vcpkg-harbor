@@ -78,3 +78,7 @@ class AuthorizationError(VcpkgHarborError):
     """Raised when authorization fails."""
 
     pass
+
+
+class PackageContentConflictError(VcpkgHarborError):
+    """An existing package identity has different bytes from the upload."""

@@ -419,3 +419,94 @@ def test_both_path_shapes_are_registered(make_client):
         assert TAGGED_PATH in paths
         for methods in (paths[UNTAGGED_PATH], paths[TAGGED_PATH]):
             assert {"get", "put", "delete", "head"} <= set(methods)
+
+
+def test_dedupe_rejects_different_bytes_without_registering_tag(make_client, storage_path):
+    with make_client() as client:
+        assert client.put(f"/nightly/{IDENTITY}", content=b"wrong bytes").status_code == 200
+        response = client.put(f"/release/{IDENTITY}", content=PAYLOAD)
+        assert response.status_code == 409
+        assert "different bytes" in response.json()["detail"]
+        assert client.get(f"/release/{IDENTITY}").status_code == 404
+        assert refs_document(storage_path)["namespaces"] == ["nightly"]
+
+
+def test_missing_object_can_be_uploaded_again(make_client, storage_path):
+    with make_client() as client:
+        assert client.put(f"/nightly/{IDENTITY}", content=PAYLOAD).status_code == 200
+        identity_blob(storage_path).unlink()
+        assert client.head(f"/nightly/{IDENTITY}").status_code == 404
+        assert client.put(f"/nightly/{IDENTITY}", content=PAYLOAD).status_code == 200
+        assert client.get(f"/nightly/{IDENTITY}").content == PAYLOAD
+
+
+def test_missing_object_reference_can_be_deleted(make_client, storage_path):
+    with make_client() as client:
+        client.put(f"/nightly/{IDENTITY}", content=PAYLOAD)
+        identity_blob(storage_path).unlink()
+        assert client.delete(f"/nightly/{IDENTITY}").status_code == 200
+        assert not tag_entry(storage_path, "nightly").exists()
+
+
+def test_internal_storage_cannot_be_overwritten(make_client):
+    with make_client() as client:
+        for path in ["/_harbor/refs/zlib/1.3.1", "/release/_harbor/refs/zlib/1.3.1"]:
+            for method in ["get", "head", "put", "delete"]:
+                assert getattr(client, method)(path).status_code == 400
+        assert client.put(f"/release/{IDENTITY}", content=PAYLOAD).status_code == 200
+
+
+def test_dashboard_prefix_does_not_bypass_cache_auth(settings):
+    from fastapi.testclient import TestClient
+
+    from vcpkg_harbor.app import create_app
+
+    settings.auth.enabled = True
+    settings.auth.type = "token"
+    settings.auth.token = "test-only-token"
+    with TestClient(create_app(settings)) as client:
+        for tag in ["packages", "packages-public", "stats", "stats-public", "partials"]:
+            for method in ["get", "head", "put", "delete"]:
+                assert getattr(client, method)(f"/{tag}/{IDENTITY}").status_code == 401
+        assert client.get("/health").status_code == 200
+
+
+def test_reserved_service_tag_is_rejected(make_client):
+    with make_client() as client:
+        assert client.put(f"/static/{IDENTITY}", content=PAYLOAD).status_code == 400
+
+
+def test_dashboard_renders_with_current_template_api(make_client):
+    with make_client() as client:
+        for path in ["/", "/packages", "/stats", "/partials/stats-summary", "/partials/recent-packages"]:
+            assert client.get(path).status_code == 200
+
+
+async def test_concurrent_tag_uploads_keep_all_references(storage_path):
+    import asyncio
+    from vcpkg_harbor.core.config import Settings
+    from vcpkg_harbor.services.cache_service import CacheService
+    from vcpkg_harbor.storage.backends.filesystem import FilesystemBackend
+
+    storage = FilesystemBackend(path=str(storage_path))
+    await storage.initialize()
+    service = CacheService(storage, Settings())
+
+    async def upload(index):
+        async def body():
+            yield PAYLOAD[:5]
+            await asyncio.sleep(0)
+            yield PAYLOAD[5:]
+        return await service.put_package(*IDENTITY.split("/"), body(), tag=f"tag-{index}")
+
+    try:
+        results = await asyncio.gather(*(upload(i) for i in range(12)))
+        assert sum(not result.deduplicated for result in results) == 1
+        assert len(refs_document(storage_path)["namespaces"]) == 12
+        await asyncio.gather(*(
+            service.delete_package(*IDENTITY.split("/"), tag=f"tag-{i}") for i in range(11)
+        ))
+        assert await service.check_exists(*IDENTITY.split("/"), tag="tag-11")
+        assert refs_document(storage_path)["namespaces"] == ["tag-11"]
+    finally:
+        await storage.close()
