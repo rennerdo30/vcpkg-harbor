@@ -89,7 +89,11 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+# Never commit real configuration: .env and every .env.<something> variant is
+# ignored, with the checked-in template .env.example explicitly re-included.
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
