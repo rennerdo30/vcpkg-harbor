@@ -1,87 +1,86 @@
 {% extends "base.html" %}
-{% from "_macros.html" import data_row, empty_state, stat_card %}
+{% from "_macros.html" import data_row, empty_state, hit_gauge, ledger_item %}
 
 {% block title %}Statistics - vcpkg-harbor{% endblock %}
 
 {% block page_title %}Statistics{% endblock %}
 
 {% block page_description %}
-<p class="mt-2 max-w-2xl text-sm text-slate-500">
-    Cache and request counters collected since the server started ({{ uptime }} ago).
+<p class="page-lede">
+    Counters collected since the server started {{ uptime }} ago. They reset when it restarts.
 </p>
 {% endblock %}
 
 {% block content %}
 <div class="space-y-6">
-    <!-- Stat cards -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-        {{ stat_card("Cached binaries", cache_stats.total_packages|count, "package") }}
-        {{ stat_card("Storage used", cache_stats.total_size_bytes|filesize, "storage") }}
-        {{ stat_card("Hit rate", "%.1f%%"|format(cache_stats.hit_rate), "speed") }}
-        {{ stat_card("Unique packages", cache_stats.unique_package_names|count, "activity") }}
-    </div>
+    <section class="panel" aria-labelledby="hit-rate-title">
+        <h2 id="hit-rate-title" class="sr-only">Hit rate</h2>
+        {{ hit_gauge(cache_stats) }}
+        <div class="ledger">
+            {{ ledger_item("Cached binaries", cache_stats.total_packages|count) }}
+            {{ ledger_item("Storage used", cache_stats.total_size_bytes|filesize) }}
+            {{ ledger_item("Unique packages", cache_stats.unique_package_names|count) }}
+            {{ ledger_item("Requests per minute", "%.2f"|format(request_stats.requests_per_minute)) }}
+        </div>
+    </section>
 
-    <!-- Detailed stats -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section class="card" aria-labelledby="cache-stats-title">
-            <div class="card-header">
-                <h2 id="cache-stats-title" class="card-title">Cache statistics</h2>
-                <span class="badge bg-slate-100 text-slate-600 ring-1 ring-slate-200">{{ cache_stats.backend_type
-                    }}</span>
+        <section class="panel" aria-labelledby="cache-stats-title">
+            <div class="panel-head">
+                <h2 id="cache-stats-title" class="panel-title">Cache</h2>
+                <span class="badge" title="Active storage backend">{{ cache_stats.backend_type }}</span>
             </div>
-            <div class="card-body">
-                <dl class="space-y-3">
-                    {{ data_row("Cache hits", cache_stats.cache_hits|count, "text-emerald-700") }}
-                    {{ data_row("Cache misses", cache_stats.cache_misses|count, "text-slate-900") }}
+            <div class="panel-body">
+                <dl class="data-list">
+                    {{ data_row("Cache hits", cache_stats.cache_hits|count, "value-good") }}
+                    {{ data_row("Cache misses", cache_stats.cache_misses|count) }}
                     {{ data_row("Uploads", cache_stats.uploads|count) }}
                     {{ data_row("Downloads", cache_stats.downloads|count) }}
-                    {{ data_row("Errors", cache_stats.errors|count, "text-rose-600" if cache_stats.errors else "text-slate-900") }}
-                    {{ data_row("Unique packages", cache_stats.unique_package_names|count) }}
+                    {{ data_row("Errors", cache_stats.errors|count, "value-bad" if cache_stats.errors else "") }}
                 </dl>
             </div>
         </section>
 
-        <section class="card" aria-labelledby="request-stats-title">
-            <div class="card-header">
-                <h2 id="request-stats-title" class="card-title">Request statistics</h2>
+        <section class="panel" aria-labelledby="request-stats-title">
+            <div class="panel-head">
+                <h2 id="request-stats-title" class="panel-title">Requests</h2>
             </div>
-            <div class="card-body">
-                <dl class="space-y-3">
+            <div class="panel-body">
+                <dl class="data-list">
                     {{ data_row("Total requests", request_stats.total_requests|count) }}
-                    {{ data_row("HEAD requests", request_stats.head_requests|count) }}
-                    {{ data_row("GET requests", request_stats.get_requests|count) }}
-                    {{ data_row("PUT requests", request_stats.put_requests|count) }}
+                    {{ data_row("HEAD (existence checks)", request_stats.head_requests|count) }}
+                    {{ data_row("GET (downloads)", request_stats.get_requests|count) }}
+                    {{ data_row("PUT (uploads)", request_stats.put_requests|count) }}
                     {{ data_row("Average response time", "%.2f ms"|format(request_stats.avg_response_time_ms)) }}
-                    {{ data_row("Requests per minute", "%.2f"|format(request_stats.requests_per_minute)) }}
                 </dl>
             </div>
         </section>
     </div>
 
     <!-- Largest packages -->
-    <section class="card overflow-hidden" aria-labelledby="largest-title">
-        <div class="card-header">
-            <h2 id="largest-title" class="card-title">Largest cached builds</h2>
+    <section class="panel overflow-hidden" aria-labelledby="largest-title">
+        <div class="panel-head">
+            <h2 id="largest-title" class="panel-title">Largest cached builds</h2>
         </div>
         {% if largest_packages %}
         <div class="table-wrap">
-            <table class="min-w-full divide-y divide-slate-200">
+            <table class="table">
                 <caption class="sr-only">The largest cached builds by size</caption>
-                <thead class="bg-slate-50">
+                <thead>
                     <tr>
-                        <th scope="col" class="th">Package</th>
-                        <th scope="col" class="th">Version</th>
-                        <th scope="col" class="th">Triplet</th>
-                        <th scope="col" class="th-num">Size</th>
+                        <th scope="col" class="sticky-col">Package</th>
+                        <th scope="col">Version</th>
+                        <th scope="col">Triplet</th>
+                        <th scope="col" class="num">Size</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody>
                     {% for pkg in largest_packages %}
-                    <tr class="row">
-                        <td class="td"><a href="{{ url_path('package_detail', name=pkg.name) }}" class="link">{{ pkg.name }}</a></td>
-                        <td class="td font-mono text-xs">{{ pkg.version }}</td>
-                        <td class="td font-mono text-xs">{{ pkg.triplet }}</td>
-                        <td class="td-num">{{ pkg.size|filesize }}</td>
+                    <tr>
+                        <th scope="row" class="sticky-col"><a href="{{ url_path('package_detail', name=pkg.name) }}" class="link">{{ pkg.name }}</a></th>
+                        <td class="mono">{{ pkg.version }}</td>
+                        <td class="mono">{{ pkg.triplet }}</td>
+                        <td class="num primary">{{ pkg.size|filesize }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

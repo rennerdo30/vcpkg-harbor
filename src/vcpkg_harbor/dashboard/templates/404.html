@@ -5,20 +5,21 @@
 
 {% block page_title %}Not found{% endblock %}
 
+{% block page_description %}
+<p class="page-lede">HTTP 404</p>
+{% endblock %}
+
 {% block content %}
-<div class="card mx-auto max-w-xl">
-    <div class="flex flex-col items-center gap-4 px-6 py-12 text-center">
-        <span class="grid h-12 w-12 place-items-center rounded-full bg-amber-50 text-amber-600 ring-1 ring-amber-100">
-            {{ icon("warning", "h-6 w-6") }}
-        </span>
-        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Error 404</p>
-        <p class="text-lg font-semibold tracking-tight text-slate-900">
-            {{ message or "The page you are looking for does not exist." }}
-        </p>
-        <div class="mt-2 flex flex-wrap items-center justify-center gap-3">
-            <a href="{{ url_path('dashboard_home') }}" class="btn-primary">Back to dashboard</a>
-            <a href="{{ url_path('packages_list') }}" class="btn-secondary">Browse packages</a>
+<section class="panel mx-auto max-w-xl">
+    <div class="empty">
+        <span class="empty-icon">{{ icon("warning", "h-5 w-5") }}</span>
+        <p class="empty-title">{{ message or "There is no page at this address." }}</p>
+        <p class="empty-hint">Check the name for typos, or look it up in the package list. A package only appears
+            once vcpkg has uploaded at least one build of it.</p>
+        <div class="mt-4 flex flex-wrap items-center justify-center gap-3">
+            <a href="{{ url_path('packages_list') }}" class="btn btn-primary">Browse packages</a>
+            <a href="{{ url_path('dashboard_home') }}" class="btn">Back to dashboard</a>
         </div>
     </div>
-</div>
+</section>
 {% endblock %}

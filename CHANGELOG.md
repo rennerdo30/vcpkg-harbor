@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Dashboard redesign** - A hit-rate gauge leads the dashboard and statistics
+  pages, followed by a strip of key figures. Light and dark themes follow the
+  system setting and can be switched from the header; tables keep the package
+  column in view on phones; failed refreshes keep the last figures and show a
+  notice. Atkinson Hyperlegible Next and Mono are bundled and served locally
+- **Dependencies** - Python dependencies raised to their current releases
+  (FastAPI 0.141, Starlette 1.6, uvicorn 0.53, Pydantic 2.13, structlog 26,
+  pytest 9, mypy 2.3, ruff 0.16), HTMX 2.0 to 4.0, and the documentation site to
+  Astro 7.3, Starlight 0.42.3 and Mermaid 12
 - Package uploads report `tag`, `namespace`, `deduplicated` and `evicted`
 - `list_packages` now uses a shared key parser on every backend, so harbor's own
   bookkeeping documents are never reported as packages

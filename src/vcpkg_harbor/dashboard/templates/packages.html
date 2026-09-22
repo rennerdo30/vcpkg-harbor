@@ -6,29 +6,27 @@
 {% block page_title %}Packages{% endblock %}
 
 {% block page_description %}
-<p class="mt-2 max-w-2xl text-sm text-slate-500">Browse the binaries currently held in this cache.</p>
+<p class="page-lede">Every port with binaries in this cache. Open one to see its builds per triplet.</p>
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-4">
     <!-- Search: a plain GET form, upgraded to search-as-you-type where HTMX runs. -->
     <form method="get" action="{{ url_path('packages_list') }}" class="flex flex-col gap-3 sm:flex-row sm:items-center" role="search">
-        <div class="relative flex-1">
+        <div class="search-field">
             <label for="package-search" class="sr-only">Search packages by name</label>
-            <span class="pointer-events-none absolute inset-y-0 left-0 grid w-10 place-items-center text-slate-400">
-                {{ icon("search") }}
-            </span>
+            <span class="search-field-icon">{{ icon("search") }}</span>
             <input id="package-search" type="search" name="search" value="{{ search }}" autocomplete="off"
-                placeholder="Search packages…" class="input-search" hx-get="{{ url_path('packages_table_partial') }}"
-                hx-trigger="input changed delay:300ms, search" hx-target="#package-results" hx-swap="innerHTML"
-                hx-indicator="#search-indicator">
+                spellcheck="false" placeholder="Search by name, e.g. zlib" class="input-search"
+                hx-get="{{ url_path('packages_table_partial') }}" hx-trigger="input changed delay:300ms, search"
+                hx-target="#package-results" hx-swap="innerHTML" hx-indicator="#search-indicator">
         </div>
         <div class="flex items-center gap-3">
-            <button type="submit" class="btn-primary">Search</button>
+            <button type="submit" class="btn btn-primary">Search</button>
             {% if search %}
-            <a href="{{ url_path('packages_list') }}" class="btn-secondary">Clear</a>
+            <a href="{{ url_path('packages_list') }}" class="btn">Clear</a>
             {% endif %}
-            <span id="search-indicator" class="htmx-indicator flex items-center gap-2 text-sm text-slate-500">
+            <span id="search-indicator" class="htmx-indicator loading-note">
                 <span class="spinner" aria-hidden="true"></span> Searching…
             </span>
         </div>
