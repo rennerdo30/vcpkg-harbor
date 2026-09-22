@@ -1,26 +1,34 @@
 #!/usr/bin/env bash
 # Rebuild the dashboard's vendored front-end assets.
 #
-# The dashboard serves Tailwind CSS and HTMX itself so it keeps working inside a
-# page with a strict Content-Security-Policy and on machines without internet
-# access. Both files are committed; run this script after changing
-# static/src/tailwind.css, the templates' utility classes, or the pinned
-# versions below.
+# The dashboard serves Tailwind CSS, HTMX and its web fonts itself so it keeps
+# working inside a page with a strict Content-Security-Policy and on machines
+# without internet access. All files are committed; run this script after
+# changing static/src/tailwind.css, the templates' utility classes, or the
+# pinned versions below.
 #
 # No Node.js required: the Tailwind standalone CLI is downloaded on demand.
 
 set -euo pipefail
 
 TAILWIND_VERSION="4.3.3"
-HTMX_VERSION="2.0.10"
+HTMX_VERSION="4.0.0"
+# Atkinson Hyperlegible Next (UI text) and Mono (package data), SIL OFL 1.1,
+# served as variable-weight Latin subsets from the Fontsource builds.
+FONTSOURCE_VERSION="5.3.0"
+FONT_FAMILIES=("atkinson-hyperlegible-next" "atkinson-hyperlegible-mono")
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 STATIC_DIR="$PROJECT_DIR/src/vcpkg_harbor/static"
 VENDOR_DIR="$STATIC_DIR/vendor"
+# Fonts sit directly below static/: a URL like /static/a/b/c has four path
+# segments and would be claimed by the vcpkg cache route
+# /{name}/{version}/{sha}/{triplet}, which is registered first.
+FONT_DIR="$STATIC_DIR/fonts"
 CACHE_DIR="${TMPDIR:-/tmp}/vcpkg-harbor-assets"
 
-mkdir -p "$VENDOR_DIR" "$CACHE_DIR"
+mkdir -p "$VENDOR_DIR" "$FONT_DIR" "$CACHE_DIR"
 
 case "$(uname -s)-$(uname -m)" in
     Darwin-arm64) TAILWIND_TARGET="macos-arm64" ;;
@@ -51,7 +59,15 @@ echo "Downloading HTMX $HTMX_VERSION..."
 curl -fsSL -o "$VENDOR_DIR/htmx.min.js" \
     "https://cdn.jsdelivr.net/npm/htmx.org@$HTMX_VERSION/dist/htmx.min.js"
 
+for family in "${FONT_FAMILIES[@]}"; do
+    echo "Downloading font $family $FONTSOURCE_VERSION..."
+    package_url="https://cdn.jsdelivr.net/npm/@fontsource-variable/$family@$FONTSOURCE_VERSION"
+    curl -fsSL -o "$FONT_DIR/$family-latin-wght-normal.woff2" \
+        "$package_url/files/$family-latin-wght-normal.woff2"
+    curl -fsSL -o "$FONT_DIR/$family-LICENSE.txt" "$package_url/LICENSE"
+done
+
 echo ""
 echo "Vendored assets rebuilt. Keep the versions in"
 echo "src/vcpkg_harbor/dashboard/urls.py in sync when bumping them."
-ls -l "$VENDOR_DIR"
+ls -l "$VENDOR_DIR" "$FONT_DIR"

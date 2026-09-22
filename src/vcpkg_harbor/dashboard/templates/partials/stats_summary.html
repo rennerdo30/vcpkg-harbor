@@ -1,7 +1,8 @@
-{% from "_macros.html" import stat_card %}
-<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-    {{ stat_card("Cached binaries", cache_stats.total_packages|count, "package") }}
-    {{ stat_card("Storage used", cache_stats.total_size_bytes|filesize, "storage") }}
-    {{ stat_card("Requests served", request_stats.total_requests|count, "activity") }}
-    {{ stat_card("Avg response", "%.1f ms"|format(request_stats.avg_response_time_ms), "speed") }}
+{% from "_macros.html" import hit_gauge, ledger_item %}
+{{ hit_gauge(cache_stats) }}
+<div class="ledger">
+    {{ ledger_item("Cached binaries", cache_stats.total_packages|count) }}
+    {{ ledger_item("Storage used", cache_stats.total_size_bytes|filesize) }}
+    {{ ledger_item("Requests served", request_stats.total_requests|count) }}
+    {{ ledger_item("Average response", "%.1f ms"|format(request_stats.avg_response_time_ms)) }}
 </div>

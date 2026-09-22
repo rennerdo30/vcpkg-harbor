@@ -1,25 +1,19 @@
 {% from "_macros.html" import empty_state, timestamp %}
 {% if recent_packages %}
-<ul class="divide-y divide-slate-100">
+<ul class="upload-list">
     {% for pkg in recent_packages %}
-    <li class="row px-5 py-3 sm:px-6">
-        <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-                <a href="{{ url_path('package_detail', name=pkg.name) }}" class="link">{{ pkg.name }}</a>
-                <p class="truncate text-xs text-slate-500">
-                    <span class="font-mono">{{ pkg.version }}</span>
-                    <span aria-hidden="true">·</span>
-                    <span class="font-mono">{{ pkg.triplet }}</span>
-                </p>
-            </div>
-            <div class="shrink-0 text-right">
-                <p class="text-sm tabular-nums text-slate-700">{{ pkg.size|filesize }}</p>
-                <p class="text-xs text-slate-400">{{ timestamp(pkg.created_at) }}</p>
-            </div>
+    <li class="upload-item">
+        <div class="min-w-0">
+            <a href="{{ url_path('package_detail', name=pkg.name) }}" class="link">{{ pkg.name }}</a>
+            <p class="upload-meta">{{ pkg.version }} <span class="sr-only">for</span><span aria-hidden="true">/</span> {{ pkg.triplet }}</p>
+        </div>
+        <div class="shrink-0 text-right">
+            <p class="text-sm font-semibold tabular-nums">{{ pkg.size|filesize }}</p>
+            <p class="text-xs text-ink-muted">{{ timestamp(pkg.created_at) }}</p>
         </div>
     </li>
     {% endfor %}
 </ul>
 {% else %}
-{{ empty_state("No recent uploads", "Point vcpkg at this server and its first upload will show up here.", "package") }}
+{{ empty_state("No uploads yet", "Point vcpkg at this server with the snippet below; its first upload shows up here.", "package") }}
 {% endif %}

@@ -20,10 +20,7 @@
     var LABEL_COPY_FAILED = 'Press Ctrl+C';
     var LABEL_COPY_ERROR = 'Copy failed';
     var MESSAGE_REQUEST_FAILED = 'Could not refresh the latest data. Check that the server is reachable.';
-    var ERROR_CLASSES = [
-        'mb-6', 'flex', 'items-start', 'gap-3', 'rounded-xl', 'bg-rose-50', 'px-4', 'py-3',
-        'text-sm', 'text-rose-800', 'ring-1', 'ring-rose-200'
-    ];
+    var ERROR_CLASS = 'alert-error';
     var DEBUG = new URLSearchParams(window.location.search).has('debug');
 
     function debug() {
@@ -140,9 +137,7 @@
         }
         container.textContent = message;
         container.classList.remove('hidden');
-        ERROR_CLASSES.forEach(function (name) {
-            container.classList.add(name);
-        });
+        container.classList.add(ERROR_CLASS);
         window.setTimeout(function () {
             container.classList.add('hidden');
         }, ERROR_HIDE_MS);
@@ -159,17 +154,26 @@
         debug('dashboard ready');
     });
 
-    /* Content swapped in by HTMX needs the same treatment. */
-    document.addEventListener('htmx:afterSwap', function (event) {
-        enhance(event.target);
+    /*
+     * Content swapped in by HTMX needs the same treatment. htmx 4 fires the
+     * event on the element that issued the request, which is not always the one
+     * that received the new content (search-as-you-type swaps into a sibling),
+     * so the swap target from the request context is preferred.
+     */
+    document.addEventListener('htmx:after:swap', function (event) {
+        var ctx = event.detail && event.detail.ctx;
+        var target = ctx && ctx.target instanceof Element ? ctx.target : document;
+        enhance(target);
     });
 
-    document.addEventListener('htmx:responseError', function (event) {
+    /* Non-2xx answer: the last good content stays, but the visitor is told. */
+    document.addEventListener('htmx:response:error', function (event) {
         debug('request failed', event.detail);
         showError(MESSAGE_REQUEST_FAILED);
     });
 
-    document.addEventListener('htmx:sendError', function (event) {
+    /* Network failure, timeout or aborted request. */
+    document.addEventListener('htmx:error', function (event) {
         debug('network error', event.detail);
         showError(MESSAGE_REQUEST_FAILED);
     });

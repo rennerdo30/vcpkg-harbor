@@ -6,8 +6,14 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block page_description %}
-<p class="mt-2 max-w-2xl text-sm text-slate-500">
-    Live view of this binary cache. Figures refresh automatically every 30 seconds.
+<p class="page-lede">How well this cache is serving vcpkg right now.</p>
+{% endblock %}
+
+{% block page_actions %}
+<p class="live-status">
+    <span id="live-indicator" class="htmx-indicator spinner" aria-hidden="true"></span>
+    <span class="live-dot" aria-hidden="true"></span>
+    Refreshes every 30 seconds
 </p>
 {% endblock %}
 
@@ -16,42 +22,42 @@
    snippet stays correct when the server is mounted under a sub-path. #}
 {% set binary_source = 'clear;http,' ~ cache_base_url ~ '/{name}/{version}/{sha}/{triplet},readwrite' %}
 <div class="space-y-6">
-    <!-- Stats overview -->
-    <div id="stats-summary" hx-get="{{ url_path('stats_summary_partial') }}" hx-trigger="every 30s"
-        hx-swap="innerHTML">
-        {% include "partials/stats_summary.html" %}
-    </div>
+    <!-- Hit rate and key figures, refreshed in place. -->
+    <section class="panel" aria-labelledby="overview-title">
+        <h2 id="overview-title" class="sr-only">Cache overview</h2>
+        <div id="stats-summary" hx-get="{{ url_path('stats_summary_partial') }}" hx-trigger="every 30s"
+            hx-swap="innerHTML" hx-indicator="#live-indicator">
+            {% include "partials/stats_summary.html" %}
+        </div>
+    </section>
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <!-- Recent packages -->
-        <section class="card overflow-hidden" aria-labelledby="recent-packages-title">
-            <div class="card-header">
-                <h2 id="recent-packages-title" class="card-title">Recent uploads</h2>
-                <span class="htmx-indicator flex items-center gap-2 text-xs text-slate-500">
-                    <span class="spinner" aria-hidden="true"></span> Updating…
-                </span>
+        <section class="panel overflow-hidden lg:col-span-3" aria-labelledby="recent-packages-title">
+            <div class="panel-head">
+                <h2 id="recent-packages-title" class="panel-title">Recent uploads</h2>
+                <a class="link text-sm" href="{{ url_path('packages_list') }}">All packages</a>
             </div>
             <div id="recent-packages" hx-get="{{ url_path('recent_packages_partial') }}" hx-trigger="every 30s"
-                hx-swap="innerHTML" aria-live="polite">
+                hx-swap="innerHTML" hx-indicator="#live-indicator" aria-live="polite">
                 {% include "partials/recent_packages.html" %}
             </div>
         </section>
 
-        <!-- Cache performance -->
-        <section class="card" aria-labelledby="cache-performance-title">
-            <div class="card-header">
-                <h2 id="cache-performance-title" class="card-title">Cache performance</h2>
-                <span class="badge {% if cache_stats.hit_rate > 80 %}bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100{% elif cache_stats.hit_rate > 50 %}bg-amber-50 text-amber-700 ring-1 ring-amber-100{% else %}bg-slate-100 text-slate-600 ring-1 ring-slate-200{% endif %}">
-                    {{ "%.1f"|format(cache_stats.hit_rate) }}% hit rate
-                </span>
+        <!-- Traffic counters -->
+        <section class="panel lg:col-span-2" aria-labelledby="cache-performance-title">
+            <div class="panel-head">
+                <h2 id="cache-performance-title" class="panel-title">Traffic since start</h2>
+                {% if cache_stats.errors %}
+                <span class="badge badge-warn">{{ cache_stats.errors|count }} errors</span>
+                {% endif %}
             </div>
-            <div class="card-body">
-                <dl class="space-y-3">
-                    {{ data_row("Cache hits", cache_stats.cache_hits|count) }}
-                    {{ data_row("Cache misses", cache_stats.cache_misses|count) }}
+            <div class="panel-body">
+                <dl class="data-list">
                     {{ data_row("Downloads", cache_stats.downloads|count) }}
                     {{ data_row("Uploads", cache_stats.uploads|count) }}
-                    {{ data_row("Errors", cache_stats.errors|count, "text-rose-600" if cache_stats.errors else "text-slate-900") }}
+                    {{ data_row("Errors", cache_stats.errors|count, "value-bad" if cache_stats.errors else "") }}
+                    {{ data_row("Unique packages", cache_stats.unique_package_names|count) }}
                     {{ data_row("Storage backend", cache_stats.backend_type) }}
                 </dl>
             </div>
@@ -59,25 +65,24 @@
     </div>
 
     <!-- Usage instructions -->
-    <section class="card" aria-labelledby="quick-start-title">
-        <div class="card-header">
-            <h2 id="quick-start-title" class="card-title">Connect vcpkg</h2>
+    <section class="panel" aria-labelledby="quick-start-title">
+        <div class="panel-head">
+            <h2 id="quick-start-title" class="panel-title">Connect vcpkg</h2>
             <a class="link text-sm" href="https://vcpkg-harbor.docs.renner.dev/getting-started/quickstart/"
                 target="_blank" rel="noopener noreferrer">Quick start guide</a>
         </div>
-        <div class="card-body">
-            <p class="text-sm text-slate-600">Set this environment variable before running vcpkg:</p>
-            <div class="code-block mt-3 flex items-start justify-between gap-4">
-                <code
-                    class="block min-w-0 flex-1 overflow-x-auto whitespace-pre pb-1">export VCPKG_BINARY_SOURCES="{{ binary_source }}"</code>
-                <button type="button" class="btn-icon shrink-0" data-copy="export VCPKG_BINARY_SOURCES=&quot;{{ binary_source }}&quot;">
+        <div class="panel-body">
+            <p class="text-sm text-ink-muted">Set this environment variable in the shell or CI job that runs vcpkg:</p>
+            <div class="code-block mt-3">
+                <code>export VCPKG_BINARY_SOURCES="{{ binary_source }}"</code>
+                <button type="button" class="copy-btn" data-copy="export VCPKG_BINARY_SOURCES=&quot;{{ binary_source }}&quot;">
                     {{ icon("copy", "h-4 w-4") }}
                     <span data-copy-label>Copy</span>
                 </button>
             </div>
-            <p class="mt-3 text-sm text-slate-500">
-                Then run <code class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">vcpkg install
-                    &lt;package&gt;</code> and binaries are cached here automatically.
+            <p class="mt-3 text-sm text-ink-muted">
+                Then run <code class="inline-code">vcpkg install &lt;package&gt;</code>: binaries are restored from
+                here when they exist and uploaded when they are built.
             </p>
         </div>
     </section>

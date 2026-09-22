@@ -1,40 +1,173 @@
 /*
- * Custom styles for the vcpkg-harbor dashboard.
+ * Design tokens and base styles for the vcpkg-harbor dashboard.
  *
- * Tailwind (loaded in base.html) covers layout and colour; this file holds the
- * few things utilities cannot express: HTMX request states, the spinner and
- * reduced-motion / focus fallbacks. Shared values live in the tokens below.
+ * This file is the single source of truth for colour, type, spacing and motion.
+ * static/src/tailwind.css maps the tokens onto Tailwind utilities and builds the
+ * component classes from them, so a palette change happens here only.
+ *
+ * The palette borrows from a nautical chart: cool paper, navy ink, a channel
+ * teal for "served from cache" and buoy amber for "had to be built".
+ *
+ * Plain CSS on purpose: it is loaded in both asset modes (vendored Tailwind and
+ * the browser build), and the font URLs below resolve against this file. The
+ * fonts are served from /static/fonts/ in both modes, never from a CDN.
  */
 
+@font-face {
+    font-family: "Atkinson Hyperlegible Next";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("../fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Atkinson Hyperlegible Mono";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("../fonts/atkinson-hyperlegible-mono-latin-wght-normal.woff2") format("woff2");
+}
+
 :root {
-    --vh-brand: #4f46e5;
-    --vh-border: #e2e8f0;
-    --vh-scrollbar-track: #f1f5f9;
-    --vh-scrollbar-thumb: #cbd5e1;
-    --vh-scrollbar-thumb-hover: #94a3b8;
-    --vh-scrollbar-size: 10px;
+    color-scheme: light;
+
+    /* Colour: light theme (chart paper) */
+    --vh-bg: #eef2f4;
+    --vh-surface: #ffffff;
+    --vh-surface-sunken: #f5f8f9;
+    --vh-ink: #10273a;
+    --vh-ink-muted: #475d6d;
+    --vh-ink-faint: #566a7a;
+    --vh-line: #d5dee4;
+    --vh-line-strong: #b3c3cd;
+    --vh-accent: #0a6873;
+    --vh-accent-strong: #074f58;
+    --vh-accent-soft: #dcefef;
+    --vh-on-accent: #ffffff;
+    --vh-signal: #e9a820;
+    --vh-signal-ink: #7a4f00;
+    --vh-signal-soft: #fbf0d6;
+    --vh-danger: #b42318;
+    --vh-danger-soft: #fdecea;
+    --vh-danger-line: #f4c7c1;
+    --vh-code-bg: #10273a;
+    --vh-code-ink: #d3eef0;
+    --vh-focus: #0a6873;
+    --vh-shadow: 0 1px 0 rgb(16 39 58 / 0.04), 0 1px 3px rgb(16 39 58 / 0.06);
+
+    /* Type */
+    --vh-font-sans: "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, sans-serif;
+    --vh-font-mono: "Atkinson Hyperlegible Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    --vh-text-xs: 0.75rem;
+    --vh-text-sm: 0.875rem;
+    --vh-text-base: 1rem;
+    --vh-text-lg: 1.125rem;
+    --vh-text-xl: 1.375rem;
+    --vh-text-2xl: 1.75rem;
+    --vh-text-display: clamp(2.75rem, 2rem + 3.5vw, 4.5rem);
+    --vh-leading-tight: 1.15;
+    --vh-leading-body: 1.55;
+
+    /* Spacing (4px grid) */
+    --vh-space-1: 0.25rem;
+    --vh-space-2: 0.5rem;
+    --vh-space-3: 0.75rem;
+    --vh-space-4: 1rem;
+    --vh-space-5: 1.25rem;
+    --vh-space-6: 1.5rem;
+    --vh-space-8: 2rem;
+    --vh-space-10: 2.5rem;
+    --vh-space-12: 3rem;
+
+    /* Shape: panels are softer than controls, pills are fully round. */
+    --vh-radius-panel: 0.75rem;
+    --vh-radius-control: 0.375rem;
     --vh-radius-full: 9999px;
+
+    /* Motion */
     --vh-transition: 150ms;
-    --vh-spinner-size: 1rem;
+    --vh-spinner-size: 0.875rem;
+
+    /* Layout */
+    --vh-page-max: 80rem;
+    --vh-header-height: 3.75rem;
 }
 
-/* HTMX: fade content that is being replaced, and reveal indicators. */
-.htmx-settling {
-    opacity: 0.85;
+/* Dark theme (night harbour). Applied when the OS asks for it, unless the
+   visitor picked light, and whenever the visitor picked dark. The two blocks
+   carry the same values; theme.js sets data-theme on <html>. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --vh-bg: #09151e;
+        --vh-surface: #0f1f2c;
+        --vh-surface-sunken: #0c1a25;
+        --vh-ink: #e3ecf1;
+        --vh-ink-muted: #a8b9c5;
+        --vh-ink-faint: #8a9fae;
+        --vh-line: #1e3445;
+        --vh-line-strong: #2d4a5e;
+        --vh-accent: #4cc3cf;
+        --vh-accent-strong: #86dde5;
+        --vh-accent-soft: #0f3540;
+        --vh-on-accent: #06222a;
+        --vh-signal: #f0bd4a;
+        --vh-signal-ink: #f5cf7a;
+        --vh-signal-soft: #3a2c0c;
+        --vh-danger: #ff8b7d;
+        --vh-danger-soft: #3b1512;
+        --vh-danger-line: #6b2620;
+        --vh-code-bg: #061019;
+        --vh-code-ink: #cdeef1;
+        --vh-focus: #86dde5;
+        --vh-shadow: 0 1px 0 rgb(0 0 0 / 0.25);
+    }
 }
 
-.htmx-request.htmx-swapping {
-    opacity: 0.6;
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --vh-bg: #09151e;
+    --vh-surface: #0f1f2c;
+    --vh-surface-sunken: #0c1a25;
+    --vh-ink: #e3ecf1;
+    --vh-ink-muted: #a8b9c5;
+    --vh-ink-faint: #8a9fae;
+    --vh-line: #1e3445;
+    --vh-line-strong: #2d4a5e;
+    --vh-accent: #4cc3cf;
+    --vh-accent-strong: #86dde5;
+    --vh-accent-soft: #0f3540;
+    --vh-on-accent: #06222a;
+    --vh-signal: #f0bd4a;
+    --vh-signal-ink: #f5cf7a;
+    --vh-signal-soft: #3a2c0c;
+    --vh-danger: #ff8b7d;
+    --vh-danger-soft: #3b1512;
+    --vh-danger-line: #6b2620;
+    --vh-code-bg: #061019;
+    --vh-code-ink: #cdeef1;
+    --vh-focus: #86dde5;
+    --vh-shadow: 0 1px 0 rgb(0 0 0 / 0.25);
 }
 
+/* HTMX request states. HTMX's own indicator stylesheet is switched off in
+   base.html (a strict style-src would block it), so the rules live here. */
 .htmx-indicator {
     opacity: 0;
+    visibility: hidden;
     transition: opacity var(--vh-transition) ease-in;
 }
 
 .htmx-request .htmx-indicator,
 .htmx-request.htmx-indicator {
     opacity: 1;
+    visibility: visible;
+}
+
+.htmx-swapping {
+    opacity: 0.6;
+    transition: opacity var(--vh-transition) ease-out;
 }
 
 /* Loading spinner used by the HTMX indicators. */
@@ -42,10 +175,24 @@
     display: inline-block;
     width: var(--vh-spinner-size);
     height: var(--vh-spinner-size);
-    border: 2px solid var(--vh-border);
-    border-top-color: var(--vh-brand);
+    border: 2px solid var(--vh-line-strong);
+    border-top-color: var(--vh-accent);
     border-radius: var(--vh-radius-full);
     animation: vh-spin 800ms linear infinite;
+}
+
+/* The dashboard's live status: during a refresh the spinner takes the dot's
+   place instead of reserving room next to it. */
+.live-status .spinner {
+    display: none;
+}
+
+.live-status .spinner.htmx-request {
+    display: inline-block;
+}
+
+.live-status .htmx-request + .live-dot {
+    display: none;
 }
 
 @keyframes vh-spin {
@@ -54,38 +201,29 @@
     }
 }
 
-/* Scrollbars that match the dashboard palette (WebKit/Blink and Firefox). */
+/* Scrollbars that follow the palette (WebKit/Blink and Firefox). */
 * {
-    scrollbar-color: var(--vh-scrollbar-thumb) var(--vh-scrollbar-track);
+    scrollbar-color: var(--vh-line-strong) transparent;
 }
 
-::-webkit-scrollbar {
-    width: var(--vh-scrollbar-size);
-    height: var(--vh-scrollbar-size);
-}
-
-::-webkit-scrollbar-track {
-    background: var(--vh-scrollbar-track);
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--vh-scrollbar-thumb);
-    border-radius: var(--vh-radius-full);
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--vh-scrollbar-thumb-hover);
-}
-
-/* Keyboard focus stays visible even where a utility class is missing. */
+/* Keyboard focus stays visible even where a component forgets it. */
 :focus-visible {
-    outline: 2px solid var(--vh-brand);
+    outline: 2px solid var(--vh-focus);
     outline-offset: 2px;
+}
+
+/* The skip link moves focus to <main>; the jump itself needs no ring. */
+main:focus {
+    outline: none;
+}
+
+::selection {
+    background: var(--vh-accent-soft);
+    color: var(--vh-ink);
 }
 
 /* Respect the operating system's reduced-motion preference. */
 @media (prefers-reduced-motion: reduce) {
-
     *,
     *::before,
     *::after {
@@ -97,6 +235,19 @@
 
     .spinner {
         animation: none;
-        border-top-color: var(--vh-border);
+        border-top-color: var(--vh-line-strong);
+        border-style: dotted;
+    }
+}
+
+/* Windows high-contrast / forced colours: keep the gauge and focus legible. */
+@media (forced-colors: active) {
+    .gauge-hits,
+    .gauge-misses {
+        fill: CanvasText;
+    }
+
+    .gauge-misses {
+        fill: GrayText;
     }
 }
