@@ -75,7 +75,7 @@ jobs:
           docker run -d --name minio --network vcpkg-test \
             -e MINIO_ROOT_USER=minioadmin \
             -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio server /data
+            quay.io/minio/minio server /data
           sleep 5
 
       - name: Run container
