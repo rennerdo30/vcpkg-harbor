@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- MinIO containers use a maintained, digest-pinned Chainguard image after public
+  Quay pulls became unavailable; existing volumes require write access for UID 65532
+
 - **Dashboard redesign** - A hit-rate gauge leads the dashboard and statistics
   pages, followed by a strip of key figures. Light and dark themes follow the
   system setting and can be switched from the header; tables keep the package
