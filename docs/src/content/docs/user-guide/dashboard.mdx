@@ -17,8 +17,10 @@ Open your browser to `http://localhost:15151/` (or your configured host/port).
 
 The main dashboard shows:
 
-- **Cache Statistics**: Total packages, storage used, hit rate
-- **Request Metrics**: Total requests, response times
+- **Hit rate**: The share of vcpkg lookups answered from the cache, with the
+  hit and miss counts drawn on a gauge
+- **Key figures**: Cached binaries, storage used, requests served and the
+  average response time
 - **Recent Packages**: Recently cached packages
 - **Quick Start Guide**: How to configure vcpkg
 
@@ -87,9 +89,10 @@ The dashboard uses no root-absolute URLs, so it can be embedded in another page:
 
 Two things make this work in a locked-down environment:
 
-- Tailwind CSS and HTMX are served from `/static` by default
+- Tailwind CSS, HTMX and the web fonts are served from `/static` by default
   (`VCPKG_DASHBOARD_ASSETS=local`), and no markup carries inline scripts or
-  styles, so a strict `Content-Security-Policy` does not break the page.
+  styles, so a strict `Content-Security-Policy` does not break the page. The
+  fonts are always served locally, also with `VCPKG_DASHBOARD_ASSETS=cdn`.
 - Nothing restricts framing unless you ask for it. To limit who may embed the
   dashboard, set a `frame-ancestors` policy:
 
@@ -104,12 +107,22 @@ The dashboard uses HTMX for automatic updates:
 - Statistics refresh every 30 seconds
 - No page reloads required
 - Minimal bandwidth usage
+- If a refresh fails, the last figures stay on screen and a notice explains
+  that the server could not be reached
+
+## Light and Dark Mode
+
+The dashboard follows the operating system's colour scheme. The button next to
+the GitHub link in the header cycles between matching the system, light and
+dark; the choice is remembered in the browser's local storage.
 
 ## Customization
 
-Design tokens and component classes live in
-`src/vcpkg_harbor/static/src/tailwind.css`. After editing them - or the utility
-classes used in the templates - rebuild the vendored stylesheet:
+Design tokens (colours for both themes, type scale, spacing, radii) live in
+`src/vcpkg_harbor/static/css/style.css`. Component classes live in
+`src/vcpkg_harbor/static/src/tailwind.css`, which maps the tokens onto Tailwind
+utilities. After editing the component classes - or the utility classes used in
+the templates - rebuild the vendored stylesheet:
 
 ```bash
 ./scripts/build-dashboard-assets.sh

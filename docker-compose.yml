@@ -40,7 +40,7 @@ services:
       start_period: 10s
 
   minio:
-    image: quay.io/minio/minio
+    image: cgr.dev/chainguard/minio:latest-dev@sha256:22660c7a21cfe5ff9cb3376af8f00d5475a0bf15e4a8ad3951d7ad99a9adf2e1
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -51,7 +51,7 @@ services:
       - MINIO_ROOT_PASSWORD=minioadmin
     command: server /data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3

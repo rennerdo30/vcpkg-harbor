@@ -1,3 +1,4 @@
+{% from "_macros.html" import icon -%}
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 
@@ -5,17 +6,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="vcpkg-harbor - binary cache server for vcpkg.">
-    <meta name="theme-color" content="#3730a3">
-    <meta name="color-scheme" content="light">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f1f2c" media="(prefers-color-scheme: dark)">
     <link rel="icon" type="image/svg+xml" href="{{ url_path('static', path='favicon.svg') }}">
     <title>{% block title %}vcpkg-harbor{% endblock %}</title>
     {#
-      HTMX injects its own indicator rules as an inline <style>, which a page
-      served with a strict Content-Security-Policy blocks. static/css/style.css
-      carries the same rules, so switch the injection off - declaratively, since
-      an inline <script> would be blocked for the same reason.
+      HTMX injects its own indicator rules as a constructed stylesheet, and turns
+      4xx/5xx responses into swaps by default. static/css/style.css carries the
+      indicator rules, and a failed refresh should leave the last good figures on
+      screen, so both are configured here - declaratively, since an inline
+      <script> would be blocked by a strict Content-Security-Policy.
     #}
-    <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
+    <meta name="htmx-config" content='{"includeIndicatorCSS": false, "noSwap": [204, 304, "4xx", "5xx"]}'>
+    {#
+      Applies the saved light/dark choice before the first paint. It is a
+      separate file (not inline) for the same Content-Security-Policy reason,
+      and deliberately not deferred so the page never flashes the wrong theme.
+    #}
+    <script src="{{ url_path('static', path='js/theme.js') }}"></script>
     {#
       Tailwind: the vendored build by default, so the dashboard also renders
       inside a page with a strict Content-Security-Policy or on a host without
@@ -33,47 +42,53 @@
     {% block head %}{% endblock %}
 </head>
 
-<body class="flex min-h-full flex-col bg-slate-50 text-slate-900 antialiased">
-    <a href="#main"
-        class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-brand-700 focus:shadow-card focus:ring-2 focus:ring-brand-500">
-        Skip to main content
-    </a>
+<body class="flex min-h-full flex-col">
+    <a href="#main" class="skip-link">Skip to main content</a>
 
     {# `nav_items` comes from the dashboard context processor: prefixed hrefs
        plus the active entry, both derived from the routes. #}
-
-    <!-- Navigation -->
-    <header class="sticky top-0 z-40 bg-brand-800">
-        <nav class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" aria-label="Main">
-            <div class="flex h-16 items-center justify-between gap-4">
-                <div class="flex min-w-0 items-center gap-6">
-                    <a href="{{ url_path('dashboard_home') }}"
-                        class="flex shrink-0 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80">
-                        <img src="{{ url_path('static', path='logo.svg') }}" alt="" width="32" height="32"
-                            class="h-8 w-8">
-                        <span class="text-lg font-semibold tracking-tight text-white">vcpkg-harbor</span>
+    <header class="site-header">
+        <nav class="page-width" aria-label="Main">
+            <div class="header-row">
+                <div class="flex min-w-0 items-stretch gap-6 self-stretch">
+                    <a href="{{ url_path('dashboard_home') }}" class="brand self-center">
+                        <svg class="brand-mark h-7 w-7" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                            <rect class="brand-mark-top" x="11" y="4" width="10" height="7" rx="1.5" />
+                            <rect class="brand-mark-low" x="5.5" y="13" width="10" height="7" rx="1.5" stroke-width="1.5" />
+                            <rect class="brand-mark-low" x="16.5" y="13" width="10" height="7" rx="1.5" stroke-width="1.5" />
+                            <path d="M3 25.5q6.5-3.5 13 0t13 0" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" />
+                        </svg>
+                        <span>vcpkg<span class="brand-sub">-harbor</span></span>
                     </a>
-                    <ul class="hidden items-center gap-1 md:flex">
+                    <ul class="nav-tabs hidden md:flex">
                         {% for item in nav_items %}
-                        <li>
-                            <a href="{{ item.href }}" class="nav-link {% if item.active %}nav-link-active{% endif %}" {%
-                                if item.active %}aria-current="page" {% endif %}>{{ item.label }}</a>
+                        <li class="flex">
+                            <a href="{{ item.href }}" class="nav-link" {% if item.active %}aria-current="page" {% endif %}>{{ item.label }}</a>
                         </li>
                         {% endfor %}
                     </ul>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="header-meta">
                     {% if cache_stats and cache_stats.backend_type %}
-                    <span class="badge bg-white/10 text-brand-100 ring-1 ring-inset ring-white/25"
-                        title="Active storage backend">{{ cache_stats.backend_type }}</span>
-                    {% endif %}
-                    {% if uptime %}
-                    <span class="hidden text-sm text-brand-100 sm:inline" title="Time since the server started">
-                        <span class="text-brand-200">Uptime</span> {{ uptime }}
+                    <span class="badge" title="Active storage backend">
+                        <span class="sr-only">Storage backend:</span>{{ cache_stats.backend_type }}
                     </span>
                     {% endif %}
+                    {% if uptime %}
+                    <span class="hidden whitespace-nowrap lg:inline" title="Time since the server started">
+                        Up {{ uptime }}
+                    </span>
+                    {% endif %}
+                    {# Revealed by theme.js; without JavaScript the OS preference applies. #}
+                    <button type="button" class="icon-btn" data-theme-toggle data-mode="system" hidden
+                        aria-label="Colour theme: match system">
+                        <span data-theme-icon="system">{{ icon("system") }}</span>
+                        <span data-theme-icon="light">{{ icon("sun") }}</span>
+                        <span data-theme-icon="dark">{{ icon("moon") }}</span>
+                    </button>
                     <a href="https://github.com/rennerdo30/vcpkg-harbor" target="_blank" rel="noopener noreferrer"
-                        class="rounded-lg p-1.5 text-brand-100 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80">
+                        class="icon-btn">
                         <span class="sr-only">vcpkg-harbor on GitHub</span>
                         <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"
                             focusable="false">
@@ -85,43 +100,34 @@
                 </div>
             </div>
             <!-- Mobile navigation: a scrollable row keeps every page reachable. -->
-            <ul class="-mx-4 flex items-center gap-1 overflow-x-auto border-t border-white/10 px-4 py-2 md:hidden">
+            <ul class="nav-mobile md:hidden">
                 {% for item in nav_items %}
-                {% set is_active = request.url.path == item.href if item.exact else
-                request.url.path.startswith(item.href) %}
-                <li>
-                    <a href="{{ item.href }}" class="nav-link {% if is_active %}nav-link-active{% endif %}" {% if
-                        is_active %}aria-current="page" {% endif %}>{{ item.label }}</a>
+                <li class="flex">
+                    <a href="{{ item.href }}" class="nav-link" {% if item.active %}aria-current="page" {% endif %}>{{ item.label }}</a>
                 </li>
                 {% endfor %}
             </ul>
         </nav>
     </header>
 
-    <!-- Page Header -->
-    {% block header %}
-    <div class="border-b border-slate-200 bg-white">
-        <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-            <h1 class="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-                {% block page_title %}Dashboard{% endblock %}
-            </h1>
-            {% block page_description %}{% endblock %}
-        </div>
-    </div>
-    {% endblock %}
-
-    <!-- Main Content -->
-    <main id="main" class="flex-1">
-        <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-            <div id="app-error" class="mb-6 hidden" role="alert" aria-live="assertive"></div>
+    <main id="main" class="flex-1" tabindex="-1">
+        <div class="page-width pb-12">
+            {% block header %}
+            <div class="page-head">
+                <div class="min-w-0">
+                    <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+                    {% block page_description %}{% endblock %}
+                </div>
+                {% block page_actions %}{% endblock %}
+            </div>
+            {% endblock %}
+            <div id="app-error" class="hidden" role="alert" aria-live="assertive"></div>
             {% block content %}{% endblock %}
         </div>
     </main>
 
-    <!-- Footer -->
-    <footer class="border-t border-slate-200 bg-white">
-        <div
-            class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-6 text-sm text-slate-500 sm:flex-row sm:px-6 lg:px-8">
+    <footer class="site-footer">
+        <div class="page-width flex flex-col items-center justify-between gap-3 py-6 sm:flex-row">
             <p>Binary cache server for vcpkg</p>
             <ul class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
                 <li><a class="footer-link" href="{{ health_url }}">Health</a></li>

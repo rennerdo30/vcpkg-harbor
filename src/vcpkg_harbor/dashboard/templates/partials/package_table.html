@@ -3,37 +3,37 @@
   Package listing table plus pagination. Rendered both inside packages.html and
   standalone by /partials/packages for search-as-you-type.
 #}
-<div class="card overflow-hidden">
+<div class="panel overflow-hidden">
     {% if packages %}
     <div class="table-wrap">
-        <table class="min-w-full divide-y divide-slate-200">
+        <table class="table">
             <caption class="sr-only">
                 {% if search %}Packages matching “{{ search }}”{% else %}Cached packages{% endif %}
             </caption>
-            <thead class="bg-slate-50">
+            <thead>
                 <tr>
-                    <th scope="col" class="th">Package</th>
-                    <th scope="col" class="th">Latest version</th>
-                    <th scope="col" class="th-num">Versions</th>
-                    <th scope="col" class="th-num">Size</th>
+                    <th scope="col" class="sticky-col">Package</th>
+                    <th scope="col">Latest version</th>
+                    <th scope="col" class="num">Versions</th>
+                    <th scope="col" class="num">Size</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody>
                 {% for pkg in packages %}
-                <tr class="row">
-                    <td class="td">
+                <tr>
+                    <th scope="row" class="sticky-col">
                         <a href="{{ url_path('package_detail', name=pkg.name) }}" class="link">{{ pkg.name }}</a>
-                    </td>
-                    <td class="td font-mono text-xs text-slate-500">{{ pkg.latest_version or "—" }}</td>
-                    <td class="td-num">{{ pkg.version_count|count }}</td>
-                    <td class="td-num">{{ pkg.total_size|filesize }}</td>
+                    </th>
+                    <td class="mono">{{ pkg.latest_version or "—" }}</td>
+                    <td class="num">{{ pkg.version_count|count }}</td>
+                    <td class="num primary">{{ pkg.total_size|filesize }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
     {% elif search %}
-    {{ empty_state("No packages match “" ~ search ~ "”", "Try a shorter query, or clear the search to browse everything in the cache.", "search") }}
+    {{ empty_state("No packages match “" ~ search ~ "”", "Search looks for the text anywhere in a port name. Try a shorter query, or clear the search to see everything.", "search") }}
     {% else %}
     {{ empty_state("Nothing cached yet", "Packages appear here as soon as vcpkg uploads its first binary to this server.", "package") }}
     {% endif %}
@@ -41,23 +41,23 @@
 
 {% if packages and not search %}
 {% set has_next = packages|length >= limit %}
-<nav class="mt-6 flex items-center justify-between gap-4" aria-label="Package pagination">
+<nav class="mt-4 flex items-center justify-between gap-4" aria-label="Package pagination">
     {% if page > 1 %}
-    <a href="{{ url_path('packages_list') }}?page={{ page - 1 }}" class="btn-secondary" rel="prev">
+    <a href="{{ url_path('packages_list') }}?page={{ page - 1 }}" class="btn" rel="prev">
         {{ icon("arrow-left", "h-4 w-4") }} Previous
     </a>
     {% else %}
-    <span class="btn-secondary pointer-events-none opacity-50" aria-disabled="true">
+    <span class="btn" aria-disabled="true">
         {{ icon("arrow-left", "h-4 w-4") }} Previous
     </span>
     {% endif %}
-    <span class="text-sm text-slate-500">Page {{ page|count }}</span>
+    <span class="text-sm text-ink-muted">Page {{ page|count }}</span>
     {% if has_next %}
-    <a href="{{ url_path('packages_list') }}?page={{ page + 1 }}" class="btn-secondary" rel="next">
+    <a href="{{ url_path('packages_list') }}?page={{ page + 1 }}" class="btn" rel="next">
         Next {{ icon("arrow-left", "h-4 w-4 rotate-180") }}
     </a>
     {% else %}
-    <span class="btn-secondary pointer-events-none opacity-50" aria-disabled="true">
+    <span class="btn" aria-disabled="true">
         Next {{ icon("arrow-left", "h-4 w-4 rotate-180") }}
     </span>
     {% endif %}

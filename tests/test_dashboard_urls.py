@@ -321,6 +321,27 @@ def test_static_files_are_served_whether_or_not_the_proxy_keeps_the_prefix(
         assert response.content
 
 
+#: Web fonts referenced by static/css/style.css.
+FONT_FILES = (
+    "fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2",
+    "fonts/atkinson-hyperlegible-mono-latin-wght-normal.woff2",
+)
+
+
+@pytest.mark.parametrize("relative", FONT_FILES)
+def test_web_fonts_are_shipped_and_served(root_client: TestClient, relative: str) -> None:
+    """The fonts load from the server itself, so the dashboard works offline.
+
+    They must stay shallow: /static/a/b/c would match the vcpkg cache route
+    /{name}/{version}/{sha}/{triplet} and never reach the static mount.
+    """
+    assert (STATIC_DIR / relative).is_file(), relative
+    assert f"../{relative}" in (STATIC_DIR / "css" / "style.css").read_text(encoding="utf-8")
+    response = root_client.get(f"/static/{relative}")
+    assert response.status_code == 200, relative
+    assert response.content
+
+
 def test_static_files_are_served_at_the_domain_root(root_client: TestClient) -> None:
     """Without a prefix the static mount keeps working as before."""
     assert root_client.get("/static/logo.svg").status_code == 200
@@ -346,11 +367,11 @@ def test_local_assets_avoid_inline_scripts_and_styles(root_client: TestClient, p
 def test_htmx_indicator_styles_are_disabled(root_client: TestClient) -> None:
     """HTMX must not inject its indicator stylesheet; static/css/style.css has it.
 
-    The injection is an inline ``<style>`` element, which is exactly what a
-    strict ``style-src`` blocks.
+    Keeping the rules in a served stylesheet means a strict ``style-src`` never
+    has to allow anything HTMX generates at runtime.
     """
     html = root_client.get("/").text
-    assert '<meta name="htmx-config" content=\'{"includeIndicatorStyles": false}\'>' in html
+    assert '"includeIndicatorCSS": false' in html
     style_css = (STATIC_DIR / "css" / "style.css").read_text(encoding="utf-8")
     assert ".htmx-indicator" in style_css
 

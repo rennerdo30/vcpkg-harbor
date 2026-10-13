@@ -217,13 +217,14 @@ The dashboard is served from the same process as the cache API:
 - **Statistics** - cache and request counters, plus the largest cached builds
 
 It is server-rendered with Jinja2 and Tailwind CSS, and refreshes its figures in
-place with HTMX — no build step and no JavaScript bundle.
+place with HTMX — no build step and no JavaScript bundle. It follows the system's
+light or dark mode, with a toggle in the header, and works down to phone width.
 
 Every link, asset and background request is built relative to the path the
 application is mounted under, so the dashboard also works behind a reverse proxy
 that serves it below the domain root (`VCPKG_PROXY_ROOT_PATH=/harbor`) and inside
-an `<iframe>` on another page. Tailwind and HTMX are served from `/static` by
-default and no markup is inline, so a strict `Content-Security-Policy` on the
+an `<iframe>` on another page. Tailwind, HTMX and the fonts are served from
+`/static` by default and no markup is inline, so a strict `Content-Security-Policy` on the
 embedding page still leaves a working dashboard.
 
 ## Tech stack

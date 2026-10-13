@@ -18,3 +18,10 @@
   pages, bundled assets, and cache HEAD/GET/PUT/DELETE requests.
 - Regression coverage must launch the real CLI so server path transformations
   are included in routing tests.
+
+# Container integration requirements
+
+- MinIO integration tests and Compose examples use an anonymously pullable,
+  digest-pinned maintained image with the existing S3 API and credential settings.
+- Compose health checks use tools included in that image. Existing MinIO volumes
+  require owner-managed write access for the image's UID/GID 65532.

@@ -16,7 +16,10 @@
   "check": "M4.5 12.75l6 6 9-13.5",
   "warning": "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z",
   "download": "M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3",
-  "arrow-left": "M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+  "arrow-left": "M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18",
+  "sun": "M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z",
+  "moon": "M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z",
+  "system": "M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"
 } %}
 
 {#- Render an inline icon. `name` must be a key of ICON_PATHS. -#}
@@ -27,38 +30,75 @@
 </svg>
 {%- endmacro %}
 
-{#- A single dashboard metric tile. -#}
-{% macro stat_card(label, value, icon_name="package") -%}
-<div class="stat-card">
-  <span class="stat-icon">{{ icon(icon_name) }}</span>
-  <div class="min-w-0">
-    <p class="stat-label">{{ label }}</p>
-    <p class="stat-value">{{ value }}</p>
-  </div>
+{#- One cell of a ledger strip: a key figure with its label underneath. -#}
+{% macro ledger_item(label, value) -%}
+<div class="ledger-item">
+  <p class="ledger-value">{{ value }}</p>
+  <p class="ledger-label">{{ label }}</p>
 </div>
 {%- endmacro %}
 
 {#- One row of a definition list, e.g. "Cache hits  1,024". -#}
-{% macro data_row(label, value, value_classes="text-slate-900") -%}
-<div class="flex items-baseline justify-between gap-4 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-  <dt class="text-sm text-slate-600">{{ label }}</dt>
-  <dd class="text-sm font-semibold tabular-nums {{ value_classes }}">{{ value }}</dd>
+{% macro data_row(label, value, value_classes="") -%}
+<div>
+  <dt>{{ label }}</dt>
+  <dd class="{{ value_classes }}">{{ value }}</dd>
 </div>
 {%- endmacro %}
 
-{#- Empty state shown inside cards and tables. -#}
+{#- Empty state shown inside panels and tables. -#}
 {% macro empty_state(title, hint="", icon_name="package") -%}
-<div class="flex flex-col items-center gap-3 px-6 py-12 text-center">
-  <span class="grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-400">
-    {{ icon(icon_name, "h-6 w-6") }}
-  </span>
-  <p class="text-sm font-medium text-slate-900">{{ title }}</p>
-  {% if hint %}<p class="max-w-sm text-sm text-slate-500">{{ hint }}</p>{% endif %}
+<div class="empty">
+  <span class="empty-icon">{{ icon(icon_name, "h-5 w-5") }}</span>
+  <p class="empty-title">{{ title }}</p>
+  {% if hint %}<p class="empty-hint">{{ hint }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{#-
+  Hit-rate gauge: the share of cache lookups answered from this cache, drawn
+  as a depth-gauge ruler. SVG attributes carry the widths, so no inline style
+  is needed and a strict Content-Security-Policy still renders it.
+-#}
+{% macro hit_gauge(cache_stats) -%}
+{% set lookups = cache_stats.cache_hits + cache_stats.cache_misses %}
+{% set rate = cache_stats.hit_rate %}
+<div class="gauge">
+  <div>
+    {% if lookups %}
+    <p class="gauge-figure">{{ "%.1f"|format(rate) }}<span class="gauge-figure-unit">%</span></p>
+    <p class="gauge-caption">of lookups served from cache</p>
+    {% else %}
+    <p class="gauge-figure" aria-describedby="gauge-empty">&ndash;<span class="gauge-figure-unit">%</span></p>
+    <p class="gauge-caption" id="gauge-empty">No lookups yet. The hit rate appears after vcpkg's first request.</p>
+    {% endif %}
+  </div>
+  <div>
+    <svg class="gauge-svg" role="img" aria-label="Hit rate {{ '%.1f'|format(rate) }} percent: {{ cache_stats.cache_hits }} hits, {{ cache_stats.cache_misses }} misses"
+      focusable="false">
+      <rect class="gauge-track" x="0" y="0.5" width="100%" height="22" rx="3" />
+      {% if lookups %}
+      <rect class="gauge-misses" x="0" y="0.5" width="100%" height="22" rx="3" />
+      <rect class="gauge-hits" x="0" y="0.5" width="{{ '%.2f'|format(rate) }}%" height="22" rx="3" />
+      {% endif %}
+      {% for step in range(0, 101, 10) %}
+      <line class="gauge-tick {% if step % 50 == 0 %}gauge-tick-major{% endif %}" x1="{{ step }}%" x2="{{ step }}%"
+        y1="27" y2="{{ 36 if step % 50 == 0 else 32 }}" />
+      {% endfor %}
+      <text class="gauge-tick-label" x="0" y="50">0</text>
+      <text class="gauge-tick-label" x="50%" y="50" text-anchor="middle">50</text>
+      <text class="gauge-tick-label" x="100%" y="50" text-anchor="end">100</text>
+    </svg>
+    <p class="gauge-legend">
+      <span><span class="swatch swatch-hits" aria-hidden="true"></span>Hits <strong>{{ cache_stats.cache_hits|count }}</strong></span>
+      <span><span class="swatch swatch-misses" aria-hidden="true"></span>Misses <strong>{{ cache_stats.cache_misses|count }}</strong></span>
+    </p>
+  </div>
 </div>
 {%- endmacro %}
 
 {#- Timestamp with a machine-readable value; app.js localises the text. -#}
 {% macro timestamp(value) -%}
 {% if value %}<time datetime="{{ value }}" data-datetime title="{{ value }}">{{ value|datetime }}</time>{% else %}<span
-  class="text-slate-400" aria-label="Unknown">&mdash;</span>{% endif %}
+  class="text-ink-faint" aria-label="Unknown">&mdash;</span>{% endif %}
 {%- endmacro %}

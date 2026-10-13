@@ -1,60 +1,58 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, stat_card, timestamp %}
+{% from "_macros.html" import icon, ledger_item, timestamp %}
 
 {% block title %}{{ name }} - vcpkg-harbor{% endblock %}
 
-{% block page_title %}{{ name }}{% endblock %}
+{% block page_title %}<span class="font-mono">{{ name }}</span>{% endblock %}
 
 {% block page_description %}
-{% if versions|length == 1 %}
-<p class="mt-2 text-sm text-slate-500">1 cached build, {{ total_size|filesize }} in total.</p>
-{% else %}
-<p class="mt-2 text-sm text-slate-500">{{ versions|length|count }} cached builds, {{ total_size|filesize }} in total.</p>
-{% endif %}
+<p class="page-lede">
+    <a href="{{ url_path('packages_list') }}" class="link inline-flex items-center gap-1">{{ icon("arrow-left", "h-4 w-4") }} All packages</a>
+</p>
 {% endblock %}
 
 {% block content %}
+{% set triplets = versions|map(attribute="triplet")|unique|list %}
 <div class="space-y-6">
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:gap-6">
-        {{ stat_card("Cached builds", versions|length|count, "package") }}
-        {{ stat_card("Total size", total_size|filesize, "storage") }}
-        {{ stat_card("Triplets", versions|map(attribute="triplet")|unique|list|length|count, "activity") }}
-    </div>
+    <section class="panel" aria-label="Summary">
+        <div class="ledger ledger-3">
+            {{ ledger_item("Cached builds", versions|length|count) }}
+            {{ ledger_item("Total size", total_size|filesize) }}
+            {{ ledger_item("Triplets", triplets|length|count) }}
+        </div>
+    </section>
 
     <!-- Versions list -->
-    <section class="card overflow-hidden" aria-labelledby="versions-title">
-        <div class="card-header">
-            <h2 id="versions-title" class="card-title">Cached builds</h2>
+    <section class="panel overflow-hidden" aria-labelledby="versions-title">
+        <div class="panel-head">
+            <h2 id="versions-title" class="panel-title">Cached builds</h2>
+            <p class="text-sm text-ink-muted">Sorted by version. Each ABI hash is a distinct build.</p>
         </div>
         <div class="table-wrap">
-            <table class="min-w-full divide-y divide-slate-200">
+            <table class="table">
                 <caption class="sr-only">Cached builds of {{ name }}</caption>
-                <thead class="bg-slate-50">
+                <thead>
                     <tr>
-                        <th scope="col" class="th">Version</th>
-                        <th scope="col" class="th">Triplet</th>
-                        <th scope="col" class="th">ABI hash</th>
-                        <th scope="col" class="th-num">Size</th>
-                        <th scope="col" class="th-num">Cached</th>
+                        <th scope="col" class="sticky-col">Version</th>
+                        <th scope="col">Triplet</th>
+                        <th scope="col">ABI hash</th>
+                        <th scope="col" class="num">Size</th>
+                        <th scope="col" class="num">Cached</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody>
                     {% for version in versions %}
-                    <tr class="row">
-                        <td class="td font-medium text-slate-900">{{ version.version }}</td>
-                        <td class="td font-mono text-xs">{{ version.triplet }}</td>
-                        <td class="td font-mono text-xs" title="{{ version.sha }}">{{ version.sha[:12] }}…</td>
-                        <td class="td-num">{{ version.size|filesize }}</td>
-                        <td class="td-num">{{ timestamp(version.created_at) }}</td>
+                    <tr>
+                        <th scope="row" class="sticky-col mono">{{ version.version }}</th>
+                        <td class="mono">{{ version.triplet }}</td>
+                        <td class="mono" title="{{ version.sha }}"><span class="sr-only">Starts with </span>{{ version.sha[:12] }}…</td>
+                        <td class="num primary">{{ version.size|filesize }}</td>
+                        <td class="num">{{ timestamp(version.created_at) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </section>
-
-    <div>
-        <a href="{{ url_path('packages_list') }}" class="btn-secondary">{{ icon("arrow-left", "h-4 w-4") }} Back to packages</a>
-    </div>
 </div>
 {% endblock %}

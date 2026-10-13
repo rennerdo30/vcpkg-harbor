@@ -50,7 +50,7 @@ VENDORED_HTMX_JS = "vendor/htmx.min.js"
 #: Pinned CDN builds used when ``dashboard.assets`` is ``"cdn"``.
 #: Keep the versions in step with scripts/build-dashboard-assets.sh.
 TAILWIND_CDN_URL = "https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.3"
-HTMX_CDN_URL = "https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"
+HTMX_CDN_URL = "https://cdn.jsdelivr.net/npm/htmx.org@4.0.0/dist/htmx.min.js"
 
 #: Value of ``dashboard.assets`` that selects the public CDNs.
 ASSETS_CDN = "cdn"
