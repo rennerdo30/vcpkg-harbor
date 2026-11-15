@@ -40,7 +40,7 @@ services:
       start_period: 10s
 
   minio:
-    image: cgr.dev/chainguard/minio:latest-dev@sha256:22660c7a21cfe5ff9cb3376af8f00d5475a0bf15e4a8ad3951d7ad99a9adf2e1
+    image: cgr.dev/chainguard/minio:latest-dev@sha256:64f223d68a772fc3e77412176417e5b8a00bb9d25ba465ae53d951e283c736ab
     ports:
       - "9000:9000"
       - "9001:9001"
